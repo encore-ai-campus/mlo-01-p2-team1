@@ -10,10 +10,8 @@ rules:
   word_separator: '_'
   word_order: qualifier_entity_property
   identifier_suffix: '_id'
-  number_suffix: '_number'
   code_suffix: '_code'
   name_suffix: '_name'
-  hash_suffix: '_hash'
   datetime_suffix: '_datetime'
   yes_no_suffix: '_yn'
   hierarchy_qualifiers:
@@ -21,7 +19,6 @@ rules:
     root_or_top: 'top_'
   approved_abbreviations:
     - id
-    - sha256
     - yn
   prohibited_legacy_abbreviations:
     - no
@@ -35,21 +32,38 @@ rules:
     - lvl
     - reg
     - at
+  identifier_rule: 식별자를 나타내는 물리명은 _id로 끝낸다.
+  code_rule: 분류 또는 상태 코드를 나타내는 물리명은 _code로 끝낸다.
+  name_rule: 대상의 이름을 나타내는 물리명은 _name으로 끝낸다.
   boolean_rule: 물리명은 _yn으로 끝나며 표준값은 Y 또는 N만 사용한다.
   datetime_rule: 날짜와 시각을 함께 가지는 물리명은 _datetime으로 끝낸다.
+  hierarchy_rule: 바로 위 계층은 parent_, 최상위 계층은 top_ 한정어를 사용한다.
   source_preservation_rule: raw CSV의 레거시 컬럼명과 값은 변경하지 않고 curated 모델에서만 표준 물리명을 적용한다.
 examples:
   valid:
     - business_area_id
+    - business_area_name
+    - parent_business_area_id
     - parent_business_area_name
+    - top_business_area_id
+    - top_business_area_name
+    - top_business_area_level_code
+    - manager_id
+    - manager_name
     - manager_department_name
+    - manager_position_name
+    - manager_hire_datetime
     - manager_active_yn
-    - scheduled_release_datetime
-    - source_record_sha256_hash
+    - business_area_registration_datetime
+    - top_business_area_registration_datetime
   invalid:
     - area_no
+    - area_nm
+    - p_area_no
     - p_area_nm
+    - top_area_lvl
+    - mgr_no
     - mgr_dept_nm
     - mgr_act_yn
-    - scheduled_release_at
+    - area_reg_dtm
     - topAreaId
