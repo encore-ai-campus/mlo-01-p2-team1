@@ -196,14 +196,13 @@ Silver 표준화는 승인된 위 규칙 파일만을 기준으로 수행한다.
 | 3 | 필수값·타입·날짜·도메인·식별자 매핑 검증 | 규칙별 1차 검증 결과 |
 | 4 | 1차 통과 행 분류 | `accepted_candidate_rows.csv` |
 | 5 | 1차 실패 행과 필드 이슈 분류 | `rejected_standardization_rows.csv`, 품질 이슈 |
-| 6 | 원천 행 기준 1차 판정 완결성 검증 | 1차 실행 요약·검증 로그 |
+| 6 | 원천 행 기준 1차 판정 완결성 검증 | `standardization_validation_check.json`(1차 실행 요약·검증 로그) |
 
 #### 품질 게이트
 
 | 검증 항목 | Accepted Candidate 수용 기준 | 실패 상태·코드 |
 | --- | --- | --- |
-| 행 수 | Bronze 입력 행과 1차 판정 결과를 대사할 수 있음 | 미대사 시 실행 실패 |
-| 스키마 | 필수 컬럼이 존재하고 파싱 가능 | `REJECTED_STANDARDIZATION`·`SCHEMA_MISMATCH` |
+| 행 수 | Bronze 입력 행과 1차 판정 결과를 대사할 수 있음 | 대사 불가 시 실행 실패 |
 | 필수값 | 기본 필수 필드 결측 0건 | `REJECTED_STANDARDIZATION`·`MISSING_REQUIRED` |
 | 타입·날짜 | 표준 타입과 날짜 변환 실패 0건 | `REJECTED_STANDARDIZATION`·`INVALID_TYPE`, `INVALID_DATE_FORMAT` |
 | 도메인 | 승인된 허용값 밖의 값 0건 | `REJECTED_STANDARDIZATION`·`DOMAIN_VIOLATION` |
