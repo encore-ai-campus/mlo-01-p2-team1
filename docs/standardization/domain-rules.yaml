@@ -3,6 +3,8 @@ version: 1
 normalization_policy:
   apply_to: curated_or_standardized_layer_only
   raw_preservation: raw CSV의 컬럼명과 셀 값은 변경·trim·형변환하지 않는다.
+  nullable_standard_columns: [parent_business_area_id]
+  required_value_violation_action: reject_record_and_log_reason
   text:
     unicode_normalization: NFKC
     outer_whitespace: trim
@@ -25,7 +27,8 @@ normalization_policy:
     manager_id:
       source_columns: [mgr_no]
       rule: 접두사와 숫자 사이의 공백·하이픈·밑줄을 제거하고 대문자로 바꾼 뒤 EMP###### 형식으로 재구성한다.
-      additional_null_tokens: [UNKNOWN]
+      invalid_required_tokens: [UNKNOWN]
+      invalid_action: reject_record_and_log_reason
       reject_if_unmatched: true
   datetime:
     source_columns: [mgr_hire_dtm, area_reg_dtm, top_area_reg_dtm]
@@ -41,7 +44,7 @@ normalization_policy:
       - '0000-00-00 00:00:00'
       - '9999-99-99 99:99:99'
       - '9999/99/99 99:99:99'
-    invalid_action: set_null_and_log_reject_reason
+    invalid_action: reject_record_and_log_reason
   top_area_level_code:
     source_columns: [top_area_lvl]
     value_map:
@@ -51,7 +54,8 @@ normalization_policy:
       top_level: TOP
       'TOP LEVEL': TOP
       최상위: TOP
-      UNKNOWN: null
+    invalid_required_values: [UNKNOWN]
+    invalid_action: reject_record_and_log_reason
   manager_active_yn:
     source_columns: [mgr_act_yn]
     case_insensitive: true
@@ -67,12 +71,14 @@ normalization_policy:
       '0': N
       미사용: N
       퇴직: N
-      UNKNOWN: null
+    invalid_required_values: [UNKNOWN]
+    invalid_action: reject_record_and_log_reason
   manager_position_name:
     source_columns: [mgr_pos_nm]
     remove_internal_space_only_after_dictionary_match: true
     allowed_values: [팀장, 과장, 차장, 실장, 대리, 부장, 사원, 파트장, 기타]
-    additional_null_tokens: [미상]
+    invalid_required_values: [미상]
+    invalid_action: reject_record_and_log_reason
 
 domains:
   - domain_id: BUSINESS_AREA_ID
@@ -98,69 +104,69 @@ domains:
     examples:
       - BIZ_00170
   - domain_id: BUSINESS_AREA_NAME
-    description: 공백 정규화 후 1자 이상 100자 이하인 업무영역 이름
+    description: 공백 정규화 후 1자 이상 100자 이하인 필수 업무영역 이름
     logical_type: name
     python_type: str
     database_type: VARCHAR
     length: 100
-    nullable: true
+    nullable: false
     format: '^.{1,100}$'
     allowed_values: []
     examples:
       - 보안관리
       - 기획
   - domain_id: TOP_AREA_LEVEL_CODE
-    description: 최상위 업무영역의 표준 레벨 코드
+    description: 최상위 업무영역의 필수 표준 레벨 코드
     logical_type: code
     python_type: str
     database_type: VARCHAR
     length: 3
-    nullable: true
+    nullable: false
     format: '^TOP$'
     allowed_values:
       - TOP
     examples:
       - TOP
   - domain_id: MANAGER_ID
-    description: EMP 접두사와 숫자 6자리로 구성한 담당자 식별자
+    description: EMP 접두사와 숫자 6자리로 구성한 필수 담당자 식별자
     logical_type: identifier
     python_type: str
     database_type: VARCHAR
     length: 9
-    nullable: true
+    nullable: false
     format: '^EMP[0-9]{6}$'
     allowed_values: []
     examples:
       - EMP000038
   - domain_id: PERSON_NAME
-    description: 공백 정규화 후 1자 이상 100자 이하인 사람 이름
+    description: 공백 정규화 후 1자 이상 100자 이하인 필수 사람 이름
     logical_type: name
     python_type: str
     database_type: VARCHAR
     length: 100
-    nullable: true
+    nullable: false
     format: '^.{1,100}$'
     allowed_values: []
     examples:
       - 이민서
   - domain_id: DEPARTMENT_NAME
-    description: 공백 정규화 후 1자 이상 100자 이하인 부서 이름
+    description: 공백 정규화 후 1자 이상 100자 이하인 필수 부서 이름
     logical_type: name
     python_type: str
     database_type: VARCHAR
     length: 100
-    nullable: true
+    nullable: false
     format: '^.{1,100}$'
     allowed_values: []
     examples:
       - 분석팀
   - domain_id: MANAGER_POSITION_NAME
-    description: 사전에 등록된 담당자 직위 이름
+    description: 사전에 등록된 필수 담당자 직위 이름
     logical_type: name
     python_type: str
     database_type: VARCHAR
     length: 10
-    nullable: true
+    nullable: false
     format: '^[가-힣]+$'
     allowed_values:
       - 팀장
@@ -176,25 +182,19 @@ domains:
       - 팀장
       - 대리
   - domain_id: DATETIME_ISO_SECOND
-    description: 여러 레거시 형식을 파싱하여 초 단위 ISO 8601로 통일한 일시
+    description: 여러 레거시 형식을 파싱하여 초 단위 ISO 8601로 통일한 필수 일시
     logical_type: datetime
     python_type: datetime
     database_type: DATETIME
-    nullable: true
+    nullable: false
     format: '%Y-%m-%dT%H:%M:%S'
     allowed_values: []
     examples:
       - '2021-12-01T05:30:46'
   - domain_id: YES_NO
-    description: 참과 거짓을 Y 또는 N 한 글자로 표현한 값
+    description: 참과 거짓을 Y 또는 N 한 글자로 표현한 필수 값
     logical_type: boolean
     python_type: str
     database_type: CHAR
     length: 1
-    nullable: true
-    format: '^[YN]$'
-    allowed_values:
-      - Y
-      - N
-    examples:
-      - Y
+    nullable: false
