@@ -396,10 +396,10 @@ project/
 
 | 시점 | 수행 작업 | 완료 증빙 |
 | --- | --- | --- |
-| 1일차 오전 | 데이터 인벤토리, Grain 분석, 프로파일링, 관계 후보 및 품질 기준선 확인 | `data_inventory.csv`, `as_is_profile.json`, `as_is_profiling.md`, `legacy_columns.csv`, `legacy_column_research.csv`, `relationship_profile.csv` |
-| 1일차 오후 | 표준 단어·용어·도메인·명명·매핑 규칙과 TO-BE 모델 확정 | `standard_words.csv`, `standard_terms.csv`, `source_to_standard_mapping.csv`, `domain_rules.yaml`, `naming_rules.yaml`, `quality_rules.yaml`, `standard_coverage_validation.json`, `business_rules.md`, `entity_candidates.csv`, `identifier_decisions.csv`, `conceptual_model.md`, `logical_model.md` |
+| 1일차 오전 | 데이터 인벤토리, Grain 분석, 프로파일링, 관계 후보 및 품질 기준선 확인 | `data_inventory.csv`, `as_is_profiling.md`, `legacy_column_research.csv`, `relationship_profile.csv` |
+| 1일차 오후 | 표준 단어·용어·도메인·명명·매핑 규칙과 TO-BE 모델 확정 | `standard_words.csv`, `standard_terms.csv`, `domain_rules.yaml`, `naming_rules.yaml`, `source_to_standard_mapping.csv`, `entity_candidates.csv`, `identifier_decisions.csv`, `conceptual_model.md`, `logical_model.md` |
 | 2일차 오전 | 크롤링, Bronze 저장, Silver 표준화·1차 검증 및 To-Be 엔터티 분리·정규화 | 회차별 `raw.csv`, `manifest.json`, `accepted_candidate_rows.csv`, `{entity_name}.csv`, `rejected_standardization_rows.csv`, `rejected_relationship_entities.csv`, `quality_issues.json`, `run_validation.json` |
-| 2일차 오후 | Final Accepted RDB 적재, 단계별 Rejected MongoDB 적재, Django 조회, 계보 및 통합 검증 | `schema.sql`, Django migration 파일, MongoDB index 정의, `lineage.md`, `end_to_end_test_report.md`, `README.md` |
+| 2일차 오후 | Final Accepted RDB 적재, 단계별 Rejected MongoDB 적재, Django 조회, 계보 및 통합 검증 | `schema.sql`, Django migration 파일, `README.md` |
 
 ## 7. 비기능 요구사항·운영 원칙
 
@@ -408,7 +408,6 @@ project/
 - 보안: API 키·세션·인증정보를 코드·매니페스트·로그에 저장하지 않는다.
 - 복구: 파싱·스키마 오류가 발생해도 원본은 Bronze에 남기고 Silver 처리만 차단한다. 실패 대상은 전체 재수집 없이 선택 재처리할 수 있어야 한다.
 - 관측성: 실행 성공·부분 실패율, 수집 파일·행 수, 체크섬 중복, Accepted Candidate·Final Accepted 건수, 판정 단계별 Rejected 분포와 엔터티별 처리율을 기록한다.
-- 준법: 수집 대상의 이용 조건·접근 정책·호출 제한을 준수하며 데이터는 내부 검증·시연 목적으로만 사용한다.
 
 ## 8. 완료 정의 및 확정 과제
 
@@ -419,14 +418,13 @@ project/
 - Bronze와 Silver의 책임이 분리되고 모든 실행에 매니페스트와 계보 정보가 존재한다.
 - 모든 Silver 입력 행이 Accepted Candidate 또는 `REJECTED_STANDARDIZATION`으로 1차 판정된다.
 - Accepted Candidate가 To-Be 엔터티로 분리·정규화되고 모든 엔터티 후보가 `FINAL_ACCEPTED` 또는 `REJECTED_RELATIONSHIP`으로 최종 판정된다.
-- Final Accepted만 정규화된 RDB에 적재되고 단계별 Rejected와 이슈는 MongoDB에 적재된다.
+- Final Accepted 레코드만 정규화된 RDB에 적재되고 단계별 Rejected와 이슈는 MongoDB에 적재된다.
 - Django에서 Accepted Candidate 건수, Final Accepted 엔터티, 표준화 Rejected와 모델·관계 Rejected를 구분하여 조회할 수 있다.
 - PK·FK, 필수값, 도메인, 타입·날짜, 엔터티 추출 및 조인 대조 검증 결과가 저장되고 수용 기준을 충족한다.
 - 원천 행에서 파생된 Employee·Area·관계 엔터티와 최종 판정 결과를 역추적할 수 있다.
-- `README.md`의 절차와 저장소에 포함된 소스 코드, 의존성 파일, 환경 변수 예시, 규칙 파일 및 DB 마이그레이션을 이용하여 신규 환경에서 수집·적재·변환·검증·조회 절차를 재현할 수 있다.
-- 문서에 기록되지 않은 수동 작업 없이 테스트 실행 1회를 완료할 수 있다.
+- `README.md`의 절차와 저장소에 포함된 소스 코드, 의존성 파일, 환경 변수 예시, 규칙 파일 및을 이용하여 신규 환경에서 수집·적재·변환·검증·조회 절차를 재현할 수 있다.
 - 실제 API 키와 DB 인증정보를 제외한 필수 환경 변수의 이름과 설정 방법이 제공된다.
-- RDB 마이그레이션, MongoDB 인덱스 생성 및 Django 실행 절차가 제공된다.
+- Django 실행 절차가 제공된다.
 
 ### 8.2 프로젝트 수행 중 확정할 사항
 
