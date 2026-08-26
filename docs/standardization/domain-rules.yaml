@@ -1,35 +1,4 @@
 version: 1
-dataset_analysis:
-  dataset_name: biz_legacy_integrated
-  raw_file: biz_legacy_integrated_raw_20260825.csv
-  snapshot_rows: 8344
-  snapshot_columns: 20
-  snapshot_last_scheduled_release_at: '2026-08-25T19:30:00+09:00'
-  grain:
-    technical: 공개 API record_id 하나당 원천 source_row_no 한 행
-    business_interpretation: 업무영역 한 건에 담당자와 상위·최상위 영역 속성이 함께 실린 레거시 스냅샷 행
-    primary_key:
-      - record_id
-    alternate_technical_keys:
-      - source_row_no
-      - source_record_sha256
-    rejected_natural_keys:
-      - columns: [business_area_id]
-        reason: 식별자 표준화 후 45개 중복 행이 있어 유일하지 않음
-      - columns: [business_area_id, manager_id]
-        reason: 식별자 표준화 후 36개 중복 행이 있어 유일하지 않음
-  observed_quality:
-    business_area_name_null_tokens: 54
-    parent_business_area_id_empty_or_null_tokens: 125
-    parent_business_area_name_empty_or_null_tokens: 320
-    manager_id_unknown_tokens: 43
-    manager_name_empty_values: 44
-    manager_department_name_null_tokens: 44
-    manager_position_unknown_values: 44
-    manager_active_unknown_values: 107
-    invalid_manager_hire_datetime_values: 96
-    invalid_business_area_registration_datetime_values: 46
-    invalid_top_business_area_registration_datetime_values: 59
 
 normalization_policy:
   apply_to: curated_or_standardized_layer_only
@@ -45,13 +14,21 @@ normalization_policy:
     values: ['', '-', 'NULL', 'N/A', 'NA', 'UNKNOWN']
   identifier:
     business_area_id:
+      source_columns: [area_no, top_area_no]
       rule: 접두사와 숫자 사이의 공백·하이픈·밑줄을 제거하고 대문자로 바꾼 뒤 BIZ_##### 형식으로 재구성한다.
       reject_if_unmatched: true
+    parent_business_area_id:
+      source_columns: [p_area_no]
+      rule: business_area_id 규칙을 적용하되 없음은 NULL로 변환한다.
+      additional_null_tokens: [없음]
+      reject_if_unmatched: true
     manager_id:
+      source_columns: [mgr_no]
       rule: 접두사와 숫자 사이의 공백·하이픈·밑줄을 제거하고 대문자로 바꾼 뒤 EMP###### 형식으로 재구성한다.
-      null_tokens: [UNKNOWN]
+      additional_null_tokens: [UNKNOWN]
       reject_if_unmatched: true
   datetime:
+    source_columns: [mgr_hire_dtm, area_reg_dtm, top_area_reg_dtm]
     accepted_source_formats:
       - '%Y-%m-%dT%H:%M:%S'
       - '%Y-%m-%d %H:%M:%S'
@@ -66,6 +43,7 @@ normalization_policy:
       - '9999/99/99 99:99:99'
     invalid_action: set_null_and_log_reject_reason
   top_area_level_code:
+    source_columns: [top_area_lvl]
     value_map:
       '1': TOP
       L1: TOP
@@ -75,6 +53,7 @@ normalization_policy:
       최상위: TOP
       UNKNOWN: null
   manager_active_yn:
+    source_columns: [mgr_act_yn]
     case_insensitive: true
     trim_before_mapping: true
     value_map:
@@ -90,59 +69,12 @@ normalization_policy:
       퇴직: N
       UNKNOWN: null
   manager_position_name:
+    source_columns: [mgr_pos_nm]
     remove_internal_space_only_after_dictionary_match: true
     allowed_values: [팀장, 과장, 차장, 실장, 대리, 부장, 사원, 파트장, 기타]
-    null_tokens: [미상]
+    additional_null_tokens: [미상]
 
 domains:
-  - domain_id: RECORD_ID
-    description: 공개 API 레코드의 양의 정수 기술 식별자
-    logical_type: identifier
-    python_type: int
-    database_type: BIGINT
-    nullable: false
-    minimum: 1
-    allowed_values: []
-    examples: [153751]
-  - domain_id: SOURCE_ROW_NUMBER
-    description: 원천 데이터의 1부터 시작하는 행 번호
-    logical_type: sequence
-    python_type: int
-    database_type: INTEGER
-    nullable: false
-    minimum: 1
-    maximum: 51250
-    allowed_values: []
-    examples: [1, 8344]
-  - domain_id: SHA256_HASH
-    description: 소문자 16진수 64자로 표현한 SHA-256 해시
-    logical_type: hash
-    python_type: str
-    database_type: CHAR
-    length: 64
-    nullable: false
-    format: '^[0-9a-f]{64}$'
-    allowed_values: []
-  - domain_id: RELEASE_SLOT
-    description: 7일 공개 주기의 0부터 시작하는 슬롯 번호
-    logical_type: sequence
-    python_type: int
-    database_type: SMALLINT
-    nullable: false
-    minimum: 0
-    maximum: 3359
-    allowed_values: []
-    examples: [0, 546]
-  - domain_id: DATETIME_KST_ISO_SECOND
-    description: Asia/Seoul 오프셋을 포함하고 초 단위까지 표현한 ISO 8601 일시
-    logical_type: datetime_with_timezone
-    python_type: datetime
-    database_type: TIMESTAMP_WITH_TIME_ZONE
-    length: 25
-    nullable: false
-    format: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+09:00$'
-    allowed_values: []
-    examples: ['2026-08-25T19:30:00+09:00']
   - domain_id: BUSINESS_AREA_ID
     description: BIZ_ 접두사와 숫자 5자리로 구성한 필수 업무영역 식별자
     logical_type: identifier
@@ -152,7 +84,8 @@ domains:
     nullable: false
     format: '^BIZ_[0-9]{5}$'
     allowed_values: []
-    examples: [BIZ_11608]
+    examples:
+      - BIZ_11608
   - domain_id: OPTIONAL_BUSINESS_AREA_ID
     description: BIZ_ 접두사와 숫자 5자리로 구성하며 상위 영역이 없으면 NULL인 업무영역 식별자
     logical_type: identifier
@@ -162,7 +95,8 @@ domains:
     nullable: true
     format: '^BIZ_[0-9]{5}$'
     allowed_values: []
-    examples: [BIZ_00170]
+    examples:
+      - BIZ_00170
   - domain_id: BUSINESS_AREA_NAME
     description: 공백 정규화 후 1자 이상 100자 이하인 업무영역 이름
     logical_type: name
@@ -172,7 +106,9 @@ domains:
     nullable: true
     format: '^.{1,100}$'
     allowed_values: []
-    examples: [보안관리, 기획]
+    examples:
+      - 보안관리
+      - 기획
   - domain_id: TOP_AREA_LEVEL_CODE
     description: 최상위 업무영역의 표준 레벨 코드
     logical_type: code
@@ -181,8 +117,10 @@ domains:
     length: 3
     nullable: true
     format: '^TOP$'
-    allowed_values: [TOP]
-    examples: [TOP]
+    allowed_values:
+      - TOP
+    examples:
+      - TOP
   - domain_id: MANAGER_ID
     description: EMP 접두사와 숫자 6자리로 구성한 담당자 식별자
     logical_type: identifier
@@ -192,7 +130,8 @@ domains:
     nullable: true
     format: '^EMP[0-9]{6}$'
     allowed_values: []
-    examples: [EMP000038]
+    examples:
+      - EMP000038
   - domain_id: PERSON_NAME
     description: 공백 정규화 후 1자 이상 100자 이하인 사람 이름
     logical_type: name
@@ -202,7 +141,8 @@ domains:
     nullable: true
     format: '^.{1,100}$'
     allowed_values: []
-    examples: [이민서]
+    examples:
+      - 이민서
   - domain_id: DEPARTMENT_NAME
     description: 공백 정규화 후 1자 이상 100자 이하인 부서 이름
     logical_type: name
@@ -212,7 +152,8 @@ domains:
     nullable: true
     format: '^.{1,100}$'
     allowed_values: []
-    examples: [분석팀]
+    examples:
+      - 분석팀
   - domain_id: MANAGER_POSITION_NAME
     description: 사전에 등록된 담당자 직위 이름
     logical_type: name
@@ -221,17 +162,29 @@ domains:
     length: 10
     nullable: true
     format: '^[가-힣]+$'
-    allowed_values: [팀장, 과장, 차장, 실장, 대리, 부장, 사원, 파트장, 기타]
-    examples: [팀장, 대리]
+    allowed_values:
+      - 팀장
+      - 과장
+      - 차장
+      - 실장
+      - 대리
+      - 부장
+      - 사원
+      - 파트장
+      - 기타
+    examples:
+      - 팀장
+      - 대리
   - domain_id: DATETIME_ISO_SECOND
     description: 여러 레거시 형식을 파싱하여 초 단위 ISO 8601로 통일한 일시
     logical_type: datetime
     python_type: datetime
     database_type: DATETIME
     nullable: true
-    format: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$'
+    format: '%Y-%m-%dT%H:%M:%S'
     allowed_values: []
-    examples: ['2021-12-01T05:30:46']
+    examples:
+      - '2021-12-01T05:30:46'
   - domain_id: YES_NO
     description: 참과 거짓을 Y 또는 N 한 글자로 표현한 값
     logical_type: boolean
@@ -240,5 +193,8 @@ domains:
     length: 1
     nullable: true
     format: '^[YN]$'
-    allowed_values: [Y, N]
-    examples: [Y, N]
+    allowed_values:
+      - Y
+      - N
+    examples:
+      - Y
