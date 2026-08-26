@@ -1,16 +1,16 @@
 term_id,logical_term,physical_name,word_ids,definition,domain_id,nullable,source_columns
 BUSINESS_AREA_ID,업무영역ID,business_area_id,BUSINESS|AREA|ID,업무영역을 구분하는 표준 식별자,BUSINESS_AREA_ID,N,area_no
-BUSINESS_AREA_NAME,업무영역명,business_area_name,BUSINESS|AREA|NAME,업무영역의 이름,BUSINESS_AREA_NAME,Y,area_nm
+BUSINESS_AREA_NAME,업무영역명,business_area_name,BUSINESS|AREA|NAME,업무영역의 이름,BUSINESS_AREA_NAME,N,area_nm
 PARENT_BUSINESS_AREA_ID,상위업무영역ID,parent_business_area_id,PARENT|BUSINESS|AREA|ID,현재 업무영역의 바로 위 업무영역 식별자,OPTIONAL_BUSINESS_AREA_ID,Y,p_area_no
-PARENT_BUSINESS_AREA_NAME,상위업무영역명,parent_business_area_name,PARENT|BUSINESS|AREA|NAME,현재 업무영역의 바로 위 업무영역 이름,BUSINESS_AREA_NAME,Y,p_area_nm
+PARENT_BUSINESS_AREA_NAME,상위업무영역명,parent_business_area_name,PARENT|BUSINESS|AREA|NAME,현재 업무영역의 바로 위 업무영역 이름,BUSINESS_AREA_NAME,N,p_area_nm
 TOP_BUSINESS_AREA_ID,최상위업무영역ID,top_business_area_id,TOP|BUSINESS|AREA|ID,현재 업무영역이 속한 최상위 업무영역 식별자,BUSINESS_AREA_ID,N,top_area_no
 TOP_BUSINESS_AREA_NAME,최상위업무영역명,top_business_area_name,TOP|BUSINESS|AREA|NAME,현재 업무영역이 속한 최상위 업무영역 이름,BUSINESS_AREA_NAME,N,top_area_nm
-TOP_BUSINESS_AREA_LEVEL_CODE,최상위업무영역레벨코드,top_business_area_level_code,TOP|BUSINESS|AREA|LEVEL|CODE,최상위 업무영역의 계층 레벨을 나타내는 표준 코드,TOP_AREA_LEVEL_CODE,Y,top_area_lvl
-MANAGER_ID,담당자ID,manager_id,MANAGER|ID,업무영역 담당자를 구분하는 임직원 식별자,MANAGER_ID,Y,mgr_no
-MANAGER_NAME,담당자명,manager_name,MANAGER|NAME,업무영역 담당자의 이름,PERSON_NAME,Y,mgr_nm
-MANAGER_DEPARTMENT_NAME,담당자부서명,manager_department_name,MANAGER|DEPARTMENT|NAME,업무영역 담당자가 소속된 부서 이름,DEPARTMENT_NAME,Y,mgr_dept_nm
-MANAGER_POSITION_NAME,담당자직위명,manager_position_name,MANAGER|POSITION|NAME,업무영역 담당자의 표준 직위 이름,MANAGER_POSITION_NAME,Y,mgr_pos_nm
-MANAGER_HIRE_DATETIME,담당자입사일시,manager_hire_datetime,MANAGER|HIRE|DATETIME,업무영역 담당자가 입사한 날짜와 시각,DATETIME_ISO_SECOND,Y,mgr_hire_dtm
-MANAGER_ACTIVE_YN,담당자활성여부,manager_active_yn,MANAGER|ACTIVE|YN,담당자의 현재 사용 또는 재직 여부,YES_NO,Y,mgr_act_yn
-BUSINESS_AREA_REGISTRATION_DATETIME,업무영역등록일시,business_area_registration_datetime,BUSINESS|AREA|REGISTRATION|DATETIME,업무영역이 시스템에 등록된 날짜와 시각,DATETIME_ISO_SECOND,Y,area_reg_dtm
-TOP_BUSINESS_AREA_REGISTRATION_DATETIME,최상위업무영역등록일시,top_business_area_registration_datetime,TOP|BUSINESS|AREA|REGISTRATION|DATETIME,최상위 업무영역이 시스템에 등록된 날짜와 시각,DATETIME_ISO_SECOND,Y,top_area_reg_dtm
+TOP_BUSINESS_AREA_LEVEL_CODE,최상위업무영역레벨코드,top_business_area_level_code,TOP|BUSINESS|AREA|LEVEL|CODE,최상위 업무영역의 계층 레벨을 나타내는 표준 코드,TOP_AREA_LEVEL_CODE,N,top_area_lvl
+MANAGER_ID,담당자ID,manager_id,MANAGER|ID,업무영역 담당자를 구분하는 임직원 식별자,MANAGER_ID,N,mgr_no
+MANAGER_NAME,담당자명,manager_name,MANAGER|NAME,업무영역 담당자의 이름,PERSON_NAME,N,mgr_nm
+MANAGER_DEPARTMENT_NAME,담당자부서명,manager_department_name,MANAGER|DEPARTMENT|NAME,업무영역 담당자가 소속된 부서 이름,DEPARTMENT_NAME,N,mgr_dept_nm
+MANAGER_POSITION_NAME,담당자직위명,manager_position_name,MANAGER|POSITION|NAME,업무영역 담당자의 표준 직위 이름,MANAGER_POSITION_NAME,N,mgr_pos_nm
+MANAGER_HIRE_DATETIME,담당자입사일시,manager_hire_datetime,MANAGER|HIRE|DATETIME,업무영역 담당자가 입사한 날짜와 시각,DATETIME_ISO_SECOND,N,mgr_hire_dtm
+MANAGER_ACTIVE_YN,담당자활성여부,manager_active_yn,MANAGER|ACTIVE|YN,담당자의 현재 사용 또는 재직 여부,YES_NO,N,mgr_act_yn
+BUSINESS_AREA_REGISTRATION_DATETIME,업무영역등록일시,business_area_registration_datetime,BUSINESS|AREA|REGISTRATION|DATETIME,업무영역이 시스템에 등록된 날짜와 시각,DATETIME_ISO_SECOND,N,area_reg_dtm
+TOP_BUSINESS_AREA_REGISTRATION_DATETIME,최상위업무영역등록일시,top_business_area_registration_datetime,TOP|BUSINESS|AREA|REGISTRATION|DATETIME,최상위 업무영역이 시스템에 등록된 날짜와 시각,DATETIME_ISO_SECOND,N,top_area_reg_dtm
