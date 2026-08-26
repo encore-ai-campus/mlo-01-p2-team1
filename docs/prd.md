@@ -277,15 +277,42 @@ Rejected는 단순 실패 파일이 아니라 DX 전환의 개선 대상을 설�
 
 MongoDB 연결·쓰기 오류는 원천 데이터 품질 이슈로 기록하지 않고 파이프라인 적재 오류로 구분한다.
 
-### 4.6 Django 조회 화면
+### 4.6 Django 단계별 품질 진단 대시보드
+
+Django 조회 서비스는 데이터 처리 결과를 다음 세 개의 대시보드로 구분하여 제공한다.
+
+1. 1차 대시보드: 표준화 및 기본 품질 검증 결과
+2. 2차 대시보드: 정규화 및 관계 무결성 검증 결과
+3. 3차 대시보드: 전체 데이터 파이프라인 통합 현황
+
+1차와 2차 Accepted 데이터는 동일한 RDB 안에서 서로 다른 스키마 또는 테이블로 분리하여 저장한다. 단계별 Rejected 데이터와 거절 사유는 MongoDB의 `rejection_stage`로 구분한다.
+
+```mermaid
+flowchart LR
+    RAW["Bronze<br/>Legacy Raw"] --> STD["표준화·1차 검증"]
+    STD -->|통과| STAGE1_RDB["1차 Accepted<br/>RDB"]
+    STD -->|실패| STAGE1_MONGO["1차 Rejected·사유<br/>MongoDB"]
+
+    STAGE1_RDB --> NORMALIZE["엔터티 분리·정규화<br/>관계 검증"]
+    NORMALIZE -->|통과| STAGE2_RDB["2차 Accepted<br/>RDB"]
+    NORMALIZE -->|실패| STAGE2_MONGO["2차 Rejected·사유<br/>MongoDB"]
+
+    PIPELINE["3차 통합 대시보드"] --> DASH1["1차 대시보드"]
+    PIPELINE --> DASH2["2차 대시보드"]
+```
+
+#### 화면 구성 및 완료 기준
 
 | 화면 | 주요 기능 | 완료 기준 |
 | --- | --- | --- |
-| 실행 목록 | 회차별 크롤링·파이프라인 상태, 원천 행·Accepted Candidate·Final Accepted·단계별 Rejected 건수 조회 | `run_id`별 단계별 처리 요약과 로그 위치 표시 |
-| 처리 단계 요약 | 1차 통과율, 표준화 실패, 모델·관계 실패 및 Final Accepted 분포 | 판정 단계별 건수와 이슈 분포 확인 |
-| Final Accepted 데이터 | Employee·Area 조회, 키워드·상태·상위 영역 필터 | RDB의 정규화 엔터티와 계보 정보 조회 |
-| Rejected·이슈 | 원본값, 판정 단계, 엔터티, 실패 필드·관계·규칙·사유 필터 | 표준화 실패와 모델·관계 실패를 구분하고 이슈를 함께 확인 |
-| 계보 상세 | Final Accepted와 단계별 Rejected에서 Bronze 원본·매니페스트·규칙 버전과 생성 엔터티까지 이동 | `run_id`와 원천 레코드 식별자로 원천 행과 파생 엔터티를 역추적 |
+| 3차 통합 파이프라인 대시보드 | Bronze 수집부터 표준화, 정규화, RDB·MongoDB 적재까지 전체 흐름을 시각적으로 표현한다. 실행 단계별 상태와 처리 방향을 표시하고 1차·2차 대시보드 이동 버튼을 제공한다. | 선택한 `run_id`의 단계별 상태가 파이프라인 노드에 표시되고, 실행 중인 단계만 동적으로 강조된다. 1차·2차 대시보드 버튼이 정상적으로 이동한다. |
+| 1차 표준화 결과 대시보드 | 표준화 입력, 1차 Accepted, `REJECTED_STANDARDIZATION` 결과와 주요 오류 유형을 요약한다. | 동일 `run_id`에서 표준화 입력이 Accepted와 Rejected로 빠짐없이 구분되어 표시된다. |
+| 1차 Accepted 조회 | 표준화된 원천 레코드를 RDB에서 조회하고 원천명, 표준 식별자, 상태, 실행 회차로 검색·필터링한다. | RDB에 저장된 1차 Accepted 레코드가 목록과 상세 화면에 표시되고 Raw 레코드까지 역추적할 수 있다. |
+| 1차 Rejected·사유 조회 | MongoDB의 `REJECTED_STANDARDIZATION` 레코드와 필드별 실패 규칙, 원본값, 사유를 조회한다. | 실행 회차, 원천, 필드, 오류 코드, 치명도로 필터링할 수 있고 하나의 레코드에 포함된 복수 이슈를 확인할 수 있다. |
+| 2차 정규화 결과 대시보드 | 엔터티 후보, Final Accepted, `REJECTED_RELATIONSHIP` 결과와 엔터티별 처리 상태를 요약한다. | Employee·Area·관계 등 엔터티 유형별 최종 판정 결과가 구분되어 표시된다. |
+| 2차 Accepted 조회 | 정규화된 Employee·Area 등 Final Accepted 엔터티를 RDB에서 조회한다. PK, 업무키, 상위 영역, 관리자 관계를 확인한다. | 정규화 RDB의 엔터티 목록·상세·관계 정보가 표시되고 원천 행과 1차 Accepted 결과까지 역추적할 수 있다. |
+| 2차 Rejected·사유 조회 | MongoDB의 `REJECTED_RELATIONSHIP` 레코드와 PK·FK·계층·조인 오류 사유를 조회한다. | 엔터티 유형, 관계명, 오류 코드, 원천 레코드 기준으로 필터링하고 관계 검증 실패 원인을 확인할 수 있다. |
+| 실행 회차 선택 및 계보 상세 | 모든 대시보드에서 `run_id`를 선택하고 원천 파일, 매니페스트, 규칙 버전, 처리 결과를 조회한다. | 화면에 표시된 집계와 상세 데이터가 동일한 `run_id`에 속하며 원천부터 최종 결과까지 이동할 수 있다. |
 
 ## 5. 상세 요구사항 및 수용 기준
 
