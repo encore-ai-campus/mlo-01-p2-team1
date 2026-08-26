@@ -418,7 +418,7 @@ project/
 - Bronze와 Silver의 책임이 분리되고 모든 실행에 매니페스트와 계보 정보가 존재한다.
 - 모든 Silver 입력 행이 Accepted Candidate 또는 `REJECTED_STANDARDIZATION`으로 1차 판정된다.
 - Accepted Candidate가 To-Be 엔터티로 분리·정규화되고 모든 엔터티 후보가 `FINAL_ACCEPTED` 또는 `REJECTED_RELATIONSHIP`으로 최종 판정된다.
-- Final Accepted 레코드만 정규화된 RDB에 적재되고 단계별 Rejected와 이슈는 MongoDB에 적재된다.
+- Final Accepted 데이터만 정규화된 RDB에 적재되고 단계별 Rejected와 이슈는 MongoDB에 적재된다.
 - Django에서 Accepted Candidate 건수, Final Accepted 엔터티, 표준화 Rejected와 모델·관계 Rejected를 구분하여 조회할 수 있다.
 - PK·FK, 필수값, 도메인, 타입·날짜, 엔터티 추출 및 조인 대조 검증 결과가 저장되고 수용 기준을 충족한다.
 - 원천 행에서 파생된 Employee·Area·관계 엔터티와 최종 판정 결과를 역추적할 수 있다.
