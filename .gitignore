@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.env
+.venv/
+.vendor/
+logs/
+
+# Collected source data, backups, publishing work, and crawler state are
+# runtime artifacts.  The source repository must never track them.
+data/
+backup/
+state/
+
+# Local packaging/build output.
+build/
+dist/
+*.egg-info/
+
+temp/
