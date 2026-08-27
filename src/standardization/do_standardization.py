@@ -35,7 +35,9 @@ ACCEPTED_FILE = "accepted_candidate_rows.csv"
 REJECTED_FILE = "rejected_standardization_rows.csv"
 VALIDATION_FILE = "standardization_validation_check.json"
 
-_SAFE_PATH_PART = re.compile(r"^[A-Za-z0-9._-]+$")
+# run_id는 출력 디렉터리 이름으로 사용하므로 경로 안전 문자는 유지하되,
+# 수집 시스템의 timezone 표기(+0900)를 허용한다.
+_SAFE_PATH_PART = re.compile(r"^[A-Za-z0-9._+-]+$")
 _BUSINESS_ID_SOURCE = re.compile(r"^BIZ[\s_-]*([0-9]{5})$", re.IGNORECASE)
 _MANAGER_ID_SOURCE = re.compile(r"^EMP[\s_-]*([0-9]{6})$", re.IGNORECASE)
 _SCALAR_TYPES = (str, int, float, bool, datetime, date)
@@ -780,6 +782,7 @@ def do_standardization(
     ``payload``만 표준화하며 나머지 필드는 변경하거나 검증하지 않는다. 기존처럼
     payload dict 목록을 직접 전달하는 방식도 허용한다.
     """
+    print(payload)
     root = Path(project_root).resolve() if project_root else _project_root()
     mapping_path, terms_path, domain_path = _rule_paths(root)
     rule_paths = (mapping_path, terms_path, domain_path)
