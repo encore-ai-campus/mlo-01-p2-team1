@@ -201,7 +201,6 @@ class MongoDBDashboardService:
         repository_alerts = []
         try:
             run = self.mysql_repository.get_run_summary(run_id) if run_id else self.mysql_repository.get_latest_run_summary()
-            history = self.mysql_repository.get_run_history(limit=12)
             if run is None:
                 run = empty_run_summary()
                 repository_alerts.append(make_alert("WARNING", "NO_BATCH_DATA", "조회 가능한 배치가 없습니다.", source="MYSQL"))
@@ -209,18 +208,45 @@ class MongoDBDashboardService:
             run = empty_run_summary()
             history = []
             repository_alerts.append(make_alert("CRITICAL", "MYSQL_UNAVAILABLE", "MySQL 배치 데이터를 조회할 수 없습니다.", source="MYSQL"))
+        else:
+            try:
+                history = self.mysql_repository.get_run_history(limit=12)
+            except PipelineRepositoryError:
+                history = []
+                repository_alerts.append(
+                    make_alert(
+                        "WARNING",
+                        "MYSQL_HISTORY_UNAVAILABLE",
+                        "현재 배치는 조회했지만 MySQL 배치 이력을 조회할 수 없습니다.",
+                        source="MYSQL",
+                        run_id=run["run_id"],
+                    )
+                )
 
-        try:
-            if run["run_id"] == "NO-BATCH":
-                mongo_facts = empty_mongo_facts(run["run_id"])
-                trend = {}
-            else:
-                mongo_facts = self.mongodb_repository.get_rejection_summary(run["run_id"])
-                trend = self.mongodb_repository.get_run_counts([item["run_id"] for item in history])
-        except MongoRepositoryError:
+        if run["run_id"] == "NO-BATCH":
             mongo_facts = empty_mongo_facts(run["run_id"])
             trend = {}
-            repository_alerts.append(make_alert("CRITICAL", "MONGODB_UNAVAILABLE", "MongoDB rejected 데이터를 조회할 수 없습니다.", source="MONGODB", run_id=run["run_id"]))
+        else:
+            try:
+                mongo_facts = self.mongodb_repository.get_rejection_summary(run["run_id"])
+            except MongoRepositoryError:
+                mongo_facts = empty_mongo_facts(run["run_id"])
+                trend = {}
+                repository_alerts.append(make_alert("CRITICAL", "MONGODB_UNAVAILABLE", "MongoDB rejected 데이터를 조회할 수 없습니다.", source="MONGODB", run_id=run["run_id"]))
+            else:
+                try:
+                    trend = self.mongodb_repository.get_run_counts([item["run_id"] for item in history])
+                except MongoRepositoryError:
+                    trend = {}
+                    repository_alerts.append(
+                        make_alert(
+                            "WARNING",
+                            "MONGODB_TREND_UNAVAILABLE",
+                            "현재 rejected 데이터는 조회했지만 MongoDB 배치 추이를 조회할 수 없습니다.",
+                            source="MONGODB",
+                            run_id=run["run_id"],
+                        )
+                    )
 
         mongo = build_mongodb_dashboard_data(run, mongo_facts)
         alerts = repository_alerts + evaluate_mysql_alerts(run, history, policy=self.alert_policy) + evaluate_mongodb_alerts(run, mongo_facts, policy=self.alert_policy)

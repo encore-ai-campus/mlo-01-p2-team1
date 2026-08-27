@@ -140,6 +140,9 @@ class PipelineRepository:
 
     def get_latest_run_summary(self):
         if self.data_mode != "live":
+            # Demo services live for the lifetime of the Django process. Refresh
+            # the sample anchor per request so demo data never becomes stale.
+            self._sample_anchor = timezone.now().replace(microsecond=0)
             return deepcopy(_sample_run(anchor=self._sample_anchor))
 
         rows = self._fetch_all(

@@ -300,7 +300,6 @@ class MySQLDashboardService:
         repository_alerts = []
         try:
             run = self.mysql_repository.get_run_summary(run_id) if run_id else self.mysql_repository.get_latest_run_summary()
-            history = self.mysql_repository.get_run_history(limit=12)
             if run is None:
                 run = empty_run_summary()
                 repository_alerts.append(make_alert("WARNING", "NO_BATCH_DATA", "조회 가능한 배치가 없습니다.", source="MYSQL"))
@@ -308,6 +307,20 @@ class MySQLDashboardService:
             run = empty_run_summary()
             history = []
             repository_alerts.append(make_alert("CRITICAL", "MYSQL_UNAVAILABLE", "MySQL 배치 데이터를 조회할 수 없습니다.", source="MYSQL"))
+        else:
+            try:
+                history = self.mysql_repository.get_run_history(limit=12)
+            except PipelineRepositoryError:
+                history = []
+                repository_alerts.append(
+                    make_alert(
+                        "WARNING",
+                        "MYSQL_HISTORY_UNAVAILABLE",
+                        "현재 배치는 조회했지만 MySQL 배치 이력을 조회할 수 없습니다.",
+                        source="MYSQL",
+                        run_id=run["run_id"],
+                    )
+                )
 
         mysql = build_mysql_dashboard_data(run, history)
         alerts = repository_alerts + evaluate_mysql_alerts(run, history, policy=self.alert_policy)
