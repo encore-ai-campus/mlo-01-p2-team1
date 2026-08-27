@@ -177,12 +177,31 @@ def _remove_white_space(value: Any) -> Any:
 
 
 def remove_white_space_from_rows(data: Sequence[Any]) -> list[Any]:
-    """모든 row의 문자열 값에서 앞뒤·내부 공백을 제거해 새 목록을 반환한다.
+    """표준화 대상 문자열의 앞뒤·내부 공백을 제거해 새 목록을 반환한다.
 
-    컬럼명은 변경하지 않으며 원본 ``data``도 수정하지 않는다. 중첩된 MongoDB
-    document의 ``payload``와 ``_ingest`` 안에 있는 문자열도 동일하게 처리한다.
+    MongoDB 원본 document 구조이면 ``payload`` 내부만 처리하고 ``_id``, 수집
+    메타데이터 및 ``_ingest``는 변경하지 않는다. payload dict 자체가 전달되면
+    해당 row 전체를 처리한다. 컬럼명과 원본 ``data``는 변경하지 않는다.
     """
-    return [_remove_white_space(row) for row in data]
+    cleaned_rows: list[Any] = []
+    for row in data:
+        if isinstance(row, Mapping) and "payload" in row:
+            cleaned_document = dict(row)
+            cleaned_document["payload"] = _remove_white_space(row["payload"])
+            cleaned_rows.append(cleaned_document)
+        else:
+            cleaned_rows.append(_remove_white_space(row))
+    return cleaned_rows
+
+
+def _standardization_target_rows(data: Sequence[Any]) -> list[Any]:
+    """MongoDB document에서는 payload만 표준화 대상으로 추출한다."""
+    return [
+        row["payload"]
+        if isinstance(row, Mapping) and "payload" in row
+        else row
+        for row in data
+    ]
 
 
 def _manifest_metadata(manifest: Mapping[str, Any]) -> tuple[str, str, str]:
@@ -410,17 +429,27 @@ def _standardize_value(
     if column.endswith("_datetime"):
         return _datetime_value(value, policy.get("datetime", {}))
     if column == "top_business_area_level_code":
-        text = _normalize_text(value)
-        value_map = policy.get("top_area_level_code", {}).get("value_map", {})
-        return value_map.get(text, value_map.get(text.upper(), text))
-    if column == "manager_active_yn":
-        text = _normalize_text(value).upper()
+        text = "".join(_normalize_text(value).split()).upper()
         value_map = {
-            str(key).upper(): mapped
+            "".join(_normalize_text(key).split()).upper(): mapped
+            for key, mapped in policy.get("top_area_level_code", {})
+            .get("value_map", {})
+            .items()
+        }
+        return value_map.get(text, text)
+    if column == "manager_active_yn":
+        text = "".join(_normalize_text(value).split()).upper()
+        value_map = {
+            "".join(_normalize_text(key).split()).upper(): mapped
             for key, mapped in policy.get("manager_active_yn", {})
             .get("value_map", {})
             .items()
         }
+        # YAML 1.1 loader가 따옴표 없는 YES/NO를 TRUE/FALSE로 읽는 경우 방어한다.
+        if "YES" not in value_map and "TRUE" in value_map:
+            value_map["YES"] = value_map["TRUE"]
+        if "NO" not in value_map and "FALSE" in value_map:
+            value_map["NO"] = value_map["FALSE"]
         return value_map.get(text, text)
     if column == "manager_position_name":
         text = _normalize_text(value)
@@ -747,8 +776,9 @@ def do_standardization(
     """컬럼 매핑부터 검증 산출물 생성까지 수행하는 메인 파사드.
 
     payload는 ``{"manifest": {...}, "rows": [...]}`` 형식이다. ``data`` 키도
-    ``rows``의 별칭으로 허용한다. manifest 및 rows는 MongoDB 조회 결과를 그대로
-    JSON 직렬화한 값이라고 가정한다.
+    ``rows``의 별칭으로 허용한다. rows가 MongoDB 원본 document이면 각 document의
+    ``payload``만 표준화하며 나머지 필드는 변경하거나 검증하지 않는다. 기존처럼
+    payload dict 목록을 직접 전달하는 방식도 허용한다.
     """
     root = Path(project_root).resolve() if project_root else _project_root()
     mapping_path, terms_path, domain_path = _rule_paths(root)
@@ -756,6 +786,7 @@ def do_standardization(
     _require_files(rule_paths)
     manifest, data = _parse_payload(payload)
     data = remove_white_space_from_rows(data)
+    data = _standardization_target_rows(data)
     run_id, ingest_date, processed_at = _manifest_metadata(manifest)
     identity = _idempotency_key(manifest, data, rule_paths)
     base = (
