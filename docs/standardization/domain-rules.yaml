@@ -7,10 +7,10 @@ normalization_policy:
   required_value_violation_action: reject_record_and_log_reason
   text:
     unicode_normalization: NFKC
-    outer_whitespace: trim
-    tab_and_unicode_space: convert_to_ascii_space
-    repeated_whitespace: collapse_to_single_space
-    single_internal_whitespace: 사전 매핑 없이 임의 삭제하지 않고 품질 검토 대상으로 남긴다.
+    outer_whitespace: remove
+    tab_and_unicode_space: remove
+    repeated_whitespace: remove
+    single_internal_whitespace: remove
   null_tokens:
     case_insensitive: true
     values: ['', '-', 'NULL', 'N/A', 'NA', 'UNKNOWN']
@@ -48,34 +48,35 @@ normalization_policy:
   top_area_level_code:
     source_columns: [top_area_lvl]
     value_map:
-      '1': TOP
-      L1: TOP
-      TOP_LEVEL: TOP
-      top_level: TOP
-      'TOP LEVEL': TOP
-      최상위: TOP
-    invalid_required_values: [UNKNOWN]
+      '1': 'TOP'
+      'L1': 'TOP'
+      'TOP_LEVEL': 'TOP'
+      'top_level': 'TOP'
+      'TOP LEVEL': 'TOP'
+      'TOPLEVEL': 'TOP'
+      '최상위': 'TOP'
+    invalid_required_values: ['UNKNOWN']
     invalid_action: reject_record_and_log_reason
   manager_active_yn:
     source_columns: [mgr_act_yn]
     case_insensitive: true
     trim_before_mapping: true
     value_map:
-      Y: Y
-      YES: Y
-      '1': Y
-      사용: Y
-      재직: Y
-      N: N
-      NO: N
-      '0': N
-      미사용: N
-      퇴직: N
-    invalid_required_values: [UNKNOWN]
+      'Y': 'Y'
+      'YES': 'Y'
+      '1': 'Y'
+      '사용': 'Y'
+      '재직': 'Y'
+      'N': 'N'
+      'NO': 'N'
+      '0': 'N'
+      '미사용': 'N'
+      '퇴직': 'N'
+    invalid_required_values: ['UNKNOWN']
     invalid_action: reject_record_and_log_reason
   manager_position_name:
     source_columns: [mgr_pos_nm]
-    remove_internal_space_only_after_dictionary_match: true
+    remove_internal_space_before_dictionary_match: true
     allowed_values: [팀장, 과장, 차장, 실장, 대리, 부장, 사원, 파트장, 기타]
     invalid_required_values: [미상]
     invalid_action: reject_record_and_log_reason
@@ -104,7 +105,7 @@ domains:
     examples:
       - BIZ_00170
   - domain_id: BUSINESS_AREA_NAME
-    description: 공백 정규화 후 1자 이상 100자 이하인 필수 업무영역 이름
+    description: 모든 공백 제거 후 1자 이상 100자 이하인 필수 업무영역 이름
     logical_type: name
     python_type: str
     database_type: VARCHAR
@@ -139,7 +140,7 @@ domains:
     examples:
       - EMP000038
   - domain_id: PERSON_NAME
-    description: 공백 정규화 후 1자 이상 100자 이하인 필수 사람 이름
+    description: 모든 공백 제거 후 1자 이상 100자 이하인 필수 사람 이름
     logical_type: name
     python_type: str
     database_type: VARCHAR
@@ -150,7 +151,7 @@ domains:
     examples:
       - 이민서
   - domain_id: DEPARTMENT_NAME
-    description: 공백 정규화 후 1자 이상 100자 이하인 필수 부서 이름
+    description: 모든 공백 제거 후 1자 이상 100자 이하인 필수 부서 이름
     logical_type: name
     python_type: str
     database_type: VARCHAR
