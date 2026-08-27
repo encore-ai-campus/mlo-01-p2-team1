@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Legacy 수집부터 MySQL과 MongoDB 적재까지 3D로 관제하는 데이터 파이프라인 대시보드">
     <title>Data Pipeline Command Center</title>
-    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=3d3">
+    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=3d4">
     <script src="{% static 'datapipeline/vendor/echarts.min.js' %}?v=6.1.0" defer></script>
     <script src="{% static 'datapipeline/js/dashboard.js' %}?v=3d2" defer></script>
     <script type="module" src="{% static 'datapipeline/js/pipeline-3d.js' %}?v=3d5"></script>
@@ -25,10 +25,12 @@
         </nav>
         <div class="system-cluster">
             <span class="demo-tag">{{ data_mode }}</span>
-            <span class="system-online"><i></i> ALL SYSTEMS NOMINAL</span>
+            <span class="system-online status-{{ overall_status|lower }}"><i></i> {{ overall_status }} · {{ alerts|length }} SIGNALS</span>
             <time class="clock">--:--:--</time>
         </div>
     </header>
+
+    {% if alerts %}<section class="warning-signal-tray status-{{ overall_status|lower }}" aria-label="파이프라인 경고"><strong>{{ overall_status }}</strong>{% for alert in alerts|slice:":3" %}<span><b>{{ alert.source }}</b> {{ alert.message }}</span>{% endfor %}</section>{% endif %}
 
     <main class="command-layout">
         <aside class="hud-column hud-left" aria-label="수집 및 처리 지표">
@@ -36,7 +38,7 @@
                 <div class="panel-title"><span>INGESTION MATRIX</span><b>LIVE</b></div>
                 <div class="metric-pair">
                     <div><small>LEGACY INPUT</small><strong>{{ legacy.total_received|intcomma }}</strong><span>records</span></div>
-                    <div><small>ACTIVE SOURCES</small><strong>{{ legacy.source_count }}</strong><span>connected</span></div>
+                    <div><small>SOURCE DETAIL</small><strong>{{ legacy.source_count }}</strong><span>not provided</span></div>
                 </div>
                 <div class="scan-progress"><i style="--value:100%"></i></div>
             </section>

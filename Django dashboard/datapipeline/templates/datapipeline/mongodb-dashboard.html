@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="표준화와 정규화 단계에서 반려된 MongoDB rejected 데이터 및 사유 관제 화면">
     <title>MongoDB Rejected Monitor | Data Command</title>
-    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=3d3">
+    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=3d4">
     <script src="{% static 'datapipeline/vendor/echarts.min.js' %}?v=6.1.0" defer></script>
     <script src="{% static 'datapipeline/js/dashboard.js' %}?v=3d2" defer></script>
 </head>
@@ -19,10 +19,11 @@
             <a href="{% url 'datapipeline:mysql' %}"><span>02</span> MySQL</a>
             <a class="active purple-active" href="{% url 'datapipeline:mongodb' %}"><span>03</span> MongoDB</a>
         </nav>
-        <div class="system-cluster"><span class="demo-tag">{{ data_mode }}</span><span class="system-online purple-online"><i></i> MONGODB LINKED</span><time class="clock">--:--:--</time></div>
+        <div class="system-cluster"><span class="demo-tag">{{ data_mode }}</span><span class="system-online status-{{ overall_status|lower }}"><i></i> {{ overall_status }} · {{ alerts|length }} SIGNALS</span><time class="clock">--:--:--</time></div>
     </header>
 
     <main class="detail-command-layout">
+        {% if alerts %}<section class="warning-signal-tray status-{{ overall_status|lower }}" aria-label="MongoDB 경고"><strong>{{ overall_status }}</strong>{% for alert in alerts|slice:":3" %}<span><b>{{ alert.source }}</b> {{ alert.message }}</span>{% endfor %}</section>{% endif %}
         <header class="detail-command-heading mongo-command-heading">
             <div>
                 <p>DATABASE CHANNEL / REJECTED + REASON</p>
@@ -36,7 +37,7 @@
             <article class="cyber-kpi purple-kpi"><small>STANDARD REJECTED</small><strong>{{ mongo.standardized.rejected|intcomma }}</strong><span><b>{{ mongo.standardized.rate }}%</b> of {{ mongo.standardized.input|intcomma }}</span><i style="--value:{{ mongo.standardized.rate }}%"></i></article>
             <article class="cyber-kpi amber-kpi"><small>NORMALIZED REJECTED</small><strong>{{ mongo.normalized.rejected|intcomma }}</strong><span><b>{{ mongo.normalized.rate }}%</b> of {{ mongo.normalized.input|intcomma }}</span><i style="--value:{{ mongo.normalized.rate }}%"></i></article>
             <article class="cyber-kpi purple-kpi"><small>MONGODB LOAD RATE</small><strong>{{ mongo.load.rate }}%</strong><span><b>{{ mongo.load.loaded|intcomma }}</b> / {{ mongo.load.expected|intcomma }}</span><i style="--value:{{ mongo.load.rate }}%"></i></article>
-            <article class="cyber-kpi red-kpi"><small>TOP REJECT SIGNAL</small><strong class="text-kpi">필수값 누락</strong><span><b>10,123</b> MISSING_REQUIRED</span><i style="--value:38%"></i></article>
+            <article class="cyber-kpi red-kpi"><small>TOP ERROR SIGNAL</small><strong class="text-kpi">{{ mongo.top_reason.label }}</strong><span><b>{{ mongo.top_reason.count|intcomma }}</b> {{ mongo.top_reason.code }}</span><i style="--value:{{ mongo.top_reason.rate }}%"></i></article>
         </section>
 
         <section class="analytics-grid">
@@ -68,7 +69,7 @@
             </article>
 
             <article class="hud-panel span-7 reason-matrix-panel">
-                <div class="panel-title"><span>REASON CODE MATRIX</span><b>5 ACTIVE RULES</b></div>
+                <div class="panel-title"><span>REASON CODE MATRIX</span><b>{{ mongo.reasons|length }} ACTIVE RULES</b></div>
                 <div class="reason-signal-list">
                     {% for reason in mongo.reasons %}
                     <div><span>0{{ forloop.counter }}</span><p><strong>{{ reason.label }}</strong><small>{{ reason.code }}</small></p><i><b style="--value:{{ reason.rate }}%"></b></i><em>{{ reason.count|intcomma }}</em><mark>{{ reason.rate }}%</mark></div>
@@ -83,12 +84,12 @@
                     <article><div><i></i><strong>{{ collection.name }}</strong><small>{{ collection.stage }} rejected</small></div><b>{{ collection.rate }}%</b><span><i style="--value:{{ collection.rate }}%"></i></span><p>{{ collection.loaded|intcomma }} / {{ collection.expected|intcomma }} documents</p></article>
                     {% endfor %}
                 </div>
-                <div class="mongo-link-summary"><div class="link-core mongo-link-core"><span>MO</span><i></i><i></i></div><p><strong>MongoRepository</strong>URI와 컬렉션 스키마 확정 후 aggregation 결과로 연결됩니다.</p></div>
+                <div class="mongo-link-summary"><div class="link-core mongo-link-core"><span>MO</span><i></i><i></i></div><p><strong>MongoRepository</strong>두 rejected 컬렉션을 동일 run_id 기준으로 집계합니다.</p></div>
             </article>
 
             <article class="hud-panel span-12 data-grid-panel">
                 <div class="panel-title"><span>RECENT REJECTION STREAM</span><button type="button" data-refresh-button>↻ REFRESH</button></div>
-                <div class="cyber-table-wrap"><table class="cyber-table compact-cyber-table"><thead><tr><th>EVENT TIME</th><th>RECORD ID</th><th>STAGE</th><th>REASON CODE</th><th>STORAGE</th></tr></thead><tbody>{% for item in mongo.recent_rejections %}<tr><td>{{ item.time }}</td><td><strong>{{ item.record }}</strong></td><td>{{ item.stage }}</td><td><code>{{ item.reason }}</code></td><td><span class="state-chip state-purple">STORED</span></td></tr>{% endfor %}</tbody></table></div>
+                <div class="cyber-table-wrap"><table class="cyber-table compact-cyber-table"><thead><tr><th>BATCH TIME</th><th>RECORD ID</th><th>STAGE</th><th>ERROR CODE</th><th>STORAGE</th></tr></thead><tbody>{% for item in mongo.recent_rejections %}<tr><td>{{ item.time }}</td><td><strong>{{ item.record }}</strong></td><td>{{ item.stage }}</td><td><code>{{ item.reason }}</code></td><td><span class="state-chip state-purple">STORED</span></td></tr>{% endfor %}</tbody></table></div>
             </article>
         </section>
     </main>

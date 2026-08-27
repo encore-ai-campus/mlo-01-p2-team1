@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="표준화와 정규화를 통과한 MySQL accepted 데이터 적재 관제 화면">
     <title>MySQL Accepted Monitor | Data Command</title>
-    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=3d3">
+    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=3d4">
     <script src="{% static 'datapipeline/vendor/echarts.min.js' %}?v=6.1.0" defer></script>
     <script src="{% static 'datapipeline/js/dashboard.js' %}?v=3d2" defer></script>
 </head>
@@ -19,10 +19,11 @@
             <a class="active" href="{% url 'datapipeline:mysql' %}"><span>02</span> MySQL</a>
             <a href="{% url 'datapipeline:mongodb' %}"><span>03</span> MongoDB</a>
         </nav>
-        <div class="system-cluster"><span class="demo-tag">{{ data_mode }}</span><span class="system-online"><i></i> MYSQL LINKED</span><time class="clock">--:--:--</time></div>
+        <div class="system-cluster"><span class="demo-tag">{{ data_mode }}</span><span class="system-online status-{{ overall_status|lower }}"><i></i> {{ overall_status }} · {{ alerts|length }} SIGNALS</span><time class="clock">--:--:--</time></div>
     </header>
 
     <main class="detail-command-layout">
+        {% if alerts %}<section class="warning-signal-tray status-{{ overall_status|lower }}" aria-label="MySQL 경고"><strong>{{ overall_status }}</strong>{% for alert in alerts|slice:":3" %}<span><b>{{ alert.source }}</b> {{ alert.message }}</span>{% endfor %}</section>{% endif %}
         <header class="detail-command-heading">
             <div>
                 <p>DATABASE CHANNEL / ACCEPTED DATA</p>
@@ -64,12 +65,12 @@
                 <div class="echart chart-medium-detail" data-dashboard-chart="mysqlTableLoad" role="img" aria-label="MySQL 테이블별 적재율"></div>
             </article>
             <article class="hud-panel span-5 chart-panel">
-                <div class="panel-title"><span>STAGE VOLUME</span><b>K RECORDS</b></div>
+                <div class="panel-title"><span>STAGE VOLUME</span><b>RECORDS</b></div>
                 <div class="echart chart-medium-detail" data-dashboard-chart="mysqlStageVolume" role="img" aria-label="MySQL 단계별 처리 건수"></div>
             </article>
 
             <article class="hud-panel span-8 data-grid-panel">
-                <div class="panel-title"><span>TABLE INTEGRITY STATUS</span><b>4 TABLES</b></div>
+                <div class="panel-title"><span>TABLE INTEGRITY STATUS</span><b>{{ mysql.tables|length }} TABLES</b></div>
                 <div class="cyber-table-wrap">
                     <table class="cyber-table">
                         <thead><tr><th>TABLE ID</th><th>STAGE</th><th>LOADED / EXPECTED</th><th>RATE</th><th>STATUS</th></tr></thead>
@@ -87,7 +88,7 @@
 
             <article class="hud-panel span-12 data-grid-panel">
                 <div class="panel-title"><span>RECENT LOAD BATCHES</span><button type="button" data-refresh-button>↻ REFRESH</button></div>
-                <div class="cyber-table-wrap"><table class="cyber-table compact-cyber-table"><thead><tr><th>BATCH ID</th><th>STAGE</th><th>ROWS</th><th>DURATION</th><th>RESULT</th></tr></thead><tbody>{% for batch in mysql.recent_batches %}<tr><td><strong>{{ batch.id }}</strong></td><td>{{ batch.stage }}</td><td>{{ batch.rows|intcomma }}</td><td>{{ batch.duration }}</td><td><span class="state-chip state-good">{{ batch.status }}</span></td></tr>{% endfor %}</tbody></table></div>
+                <div class="cyber-table-wrap"><table class="cyber-table compact-cyber-table"><thead><tr><th>BATCH ID</th><th>STAGE</th><th>ROWS</th><th>DURATION</th><th>RESULT</th></tr></thead><tbody>{% for batch in mysql.recent_batches %}<tr><td><strong>{{ batch.id }}</strong></td><td>{{ batch.stage }}</td><td>{{ batch.rows|intcomma }}</td><td>{{ batch.duration }}</td><td><span class="state-chip {% if batch.status == 'SUCCESS' %}state-good{% else %}state-warn{% endif %}">{{ batch.status }}</span></td></tr>{% endfor %}</tbody></table></div>
             </article>
         </section>
     </main>

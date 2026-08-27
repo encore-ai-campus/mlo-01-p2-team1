@@ -118,10 +118,11 @@ MYSQL_CONFIGURED = all(
     os.getenv(key, "").strip()
     for key in ("MYSQL_NAME", "MYSQL_USER", "MYSQL_HOST")
 )
-if MYSQL_CONFIGURED:
+if DASHBOARD_DATA_MODE == "live" and MYSQL_CONFIGURED:
     DATABASES = {"default": mysql_database()}
 else:
-    # Keep the dashboard preview bootable when local DB variables are incomplete.
+    # Sample mode must stay bootable even when saved local-network credentials
+    # are temporarily unreachable.
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",

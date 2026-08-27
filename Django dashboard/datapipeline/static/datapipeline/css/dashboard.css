@@ -194,9 +194,35 @@ button { color: inherit; font: inherit; }
 .demo-tag { color: #fbc66e; border: 1px solid rgba(245, 158, 11, 0.28); background: rgba(245, 158, 11, 0.08); }
 .system-online { gap: 7px; color: #74eeb7; border: 1px solid rgba(50, 230, 140, 0.22); background: rgba(50, 230, 140, 0.06); }
 .system-online i { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 9px var(--green); animation: pulse 1.8s ease-in-out infinite; }
+.system-online.status-warning { color: #ffc96a; border-color: rgba(245, 158, 11, 0.42); background: rgba(245, 158, 11, 0.1); }
+.system-online.status-warning i { background: var(--amber); box-shadow: 0 0 11px var(--amber); }
+.system-online.status-critical { color: #ff7893; border-color: rgba(244, 63, 94, 0.45); background: rgba(244, 63, 94, 0.11); }
+.system-online.status-critical i { background: #f43f5e; box-shadow: 0 0 12px #f43f5e; animation-duration: 0.75s; }
 .purple-online { color: var(--purple-soft); border-color: rgba(168, 85, 247, 0.26); background: rgba(168, 85, 247, 0.07); }
 .purple-online i { background: var(--purple); box-shadow: 0 0 9px var(--purple); }
 .clock { min-width: 70px; color: #83a5ba; font-size: 0.65rem; }
+
+.warning-signal-tray {
+    display: flex;
+    width: min(1580px, calc(100% - 28px));
+    min-height: 34px;
+    align-items: center;
+    gap: 12px;
+    margin: 8px auto 0;
+    padding: 7px 12px;
+    overflow: hidden;
+    border: 1px solid rgba(245, 158, 11, 0.32);
+    background: rgba(245, 158, 11, 0.07);
+    color: #d8e9ef;
+    font: 0.52rem var(--font-mono);
+    letter-spacing: 0.03em;
+}
+.warning-signal-tray > strong { color: #ffc96a; letter-spacing: 0.12em; }
+.warning-signal-tray > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.warning-signal-tray > span b { margin-right: 4px; color: #f5ad38; }
+.warning-signal-tray.status-critical { border-color: rgba(244, 63, 94, 0.38); background: rgba(244, 63, 94, 0.08); }
+.warning-signal-tray.status-critical > strong,
+.warning-signal-tray.status-critical > span b { color: #ff7893; }
 
 .command-layout {
     display: grid;
@@ -285,6 +311,7 @@ button { color: inherit; font: inherit; }
 .event-green { background: var(--green); box-shadow: 0 0 7px var(--green); }
 .event-blue { background: var(--cyan); box-shadow: 0 0 7px var(--cyan); }
 .event-orange { background: var(--amber); box-shadow: 0 0 7px var(--amber); }
+.event-red { background: #f43f5e; box-shadow: 0 0 7px #f43f5e; }
 
 .pipeline-theater {
     display: flex;
@@ -661,6 +688,7 @@ button { color: inherit; font: inherit; }
     .hud-left,
     .hud-right { display: flex; }
     .command-footer { overflow-x: auto; white-space: nowrap; }
+    .warning-signal-tray { width: calc(100% - 14px); align-items: flex-start; flex-direction: column; gap: 4px; }
     .detail-command-layout { width: calc(100% - 14px); padding-top: 16px; }
     .detail-command-heading h1 { align-items: flex-start; flex-wrap: wrap; }
     .detail-actions { width: 100%; }
