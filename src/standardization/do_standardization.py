@@ -782,7 +782,6 @@ def do_standardization(
     ``payload``만 표준화하며 나머지 필드는 변경하거나 검증하지 않는다. 기존처럼
     payload dict 목록을 직접 전달하는 방식도 허용한다.
     """
-    print(payload)
     root = Path(project_root).resolve() if project_root else _project_root()
     mapping_path, terms_path, domain_path = _rule_paths(root)
     rule_paths = (mapping_path, terms_path, domain_path)
