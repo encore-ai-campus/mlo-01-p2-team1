@@ -20,7 +20,7 @@ pip install -r requirements.txt
 python manage.py runserver
 ```
 
-DB 환경 변수가 없는 동안에는 SQLite 설정과 repository의 샘플 지표를 사용하므로 세 화면을 바로 확인할 수 있습니다. 실제 접속 정보는 `.env.example`을 복사한 `.env`에 작성합니다. `.env`는 Git에서 제외됩니다.
+DB 환경 변수가 없는 동안에는 SQLite 설정과 repository의 샘플 지표를 사용하므로 세 화면을 바로 확인할 수 있습니다. 실제 접속 정보는 `.env.example`을 복사한 `.env`에 작성합니다. MySQL은 단일 `MYSQL_*` 연결을 Django ORM에서 사용하고, MongoDB는 `MONGO_*` 설정을 repository의 PyMongo 연결에서 사용합니다. `.env`는 Git에서 제외됩니다.
 
 ## 레이어 책임
 

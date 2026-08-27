@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.utils import timezone
 
 from datapipeline.repository.mysql_repository import PipelineRepository
@@ -13,7 +14,7 @@ class MySQLDashboardService:
     def _base_context():
         return {
             "active_section": "mysql",
-            "data_mode": "DEMO DATA",
+            "data_mode": "LIVE DATA" if settings.DASHBOARD_DATA_MODE == "live" else "DEMO DATA",
             "updated_at": timezone.localtime().strftime("%Y-%m-%d %H:%M:%S KST"),
         }
 
