@@ -163,6 +163,28 @@ def _parse_payload(payload: str | Mapping[str, Any]) -> tuple[dict[str, Any], li
     return dict(manifest), rows
 
 
+def _remove_white_space(value: Any) -> Any:
+    """문자열의 모든 Unicode 공백을 제거하고 중첩 컨테이너를 순회한다."""
+    if isinstance(value, str):
+        return "".join(value.split())
+    if isinstance(value, Mapping):
+        return {key: _remove_white_space(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_remove_white_space(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_remove_white_space(item) for item in value)
+    return value
+
+
+def remove_white_space_from_rows(data: Sequence[Any]) -> list[Any]:
+    """모든 row의 문자열 값에서 앞뒤·내부 공백을 제거해 새 목록을 반환한다.
+
+    컬럼명은 변경하지 않으며 원본 ``data``도 수정하지 않는다. 중첩된 MongoDB
+    document의 ``payload``와 ``_ingest`` 안에 있는 문자열도 동일하게 처리한다.
+    """
+    return [_remove_white_space(row) for row in data]
+
+
 def _manifest_metadata(manifest: Mapping[str, Any]) -> tuple[str, str, str]:
     run_id = str(manifest.get("run_id", "")).strip()
     ingest_date = str(manifest.get("ingest_date", "")).strip()
@@ -346,15 +368,25 @@ def _datetime_value(value: Any, config: Mapping[str, Any]) -> str | None:
         parsed = datetime.combine(value, datetime.min.time())
     else:
         text = _normalize_text(value)
-        if text in {str(item) for item in config.get("invalid_sentinels", [])}:
+        invalid_sentinels = {
+            "".join(str(item).split())
+            for item in config.get("invalid_sentinels", [])
+        }
+        if "".join(text.split()) in invalid_sentinels:
             return None
         parsed = None
         for source_format in config.get("accepted_source_formats", []):
-            try:
-                parsed = datetime.strptime(text, str(source_format))
+            formats = dict.fromkeys(
+                (str(source_format), "".join(str(source_format).split()))
+            )
+            for candidate_format in formats:
+                try:
+                    parsed = datetime.strptime(text, candidate_format)
+                    break
+                except ValueError:
+                    pass
+            if parsed is not None:
                 break
-            except ValueError:
-                pass
         if parsed is None:
             return None
     return parsed.strftime(str(config.get("target_format", "%Y-%m-%dT%H:%M:%S")))
@@ -723,6 +755,7 @@ def do_standardization(
     rule_paths = (mapping_path, terms_path, domain_path)
     _require_files(rule_paths)
     manifest, data = _parse_payload(payload)
+    data = remove_white_space_from_rows(data)
     run_id, ingest_date, processed_at = _manifest_metadata(manifest)
     identity = _idempotency_key(manifest, data, rule_paths)
     base = (
@@ -893,4 +926,5 @@ __all__ = [
     "check_validations",
     "do_column_mapping",
     "do_standardization",
+    "remove_white_space_from_rows",
 ]
