@@ -7,8 +7,10 @@ from datapipeline.service.mongodb_services import (
     build_mongodb_dashboard_data,
     empty_mongo_facts,
     evaluate_mongodb_alerts,
+    evaluate_mongodb_run_alignment,
 )
 from datapipeline.service.mysql_services import (
+    aggregate_run_summaries,
     alert_status,
     build_mysql_dashboard_data,
     empty_run_summary,
@@ -60,40 +62,49 @@ class MainDashboardService:
     def get_dashboard(self):
         repository_alerts = []
         try:
-            run = self.mysql_repository.get_latest_run_summary()
-            if run is None:
+            all_runs = self.mysql_repository.get_all_run_summaries()
+            if not all_runs:
+                latest_run = empty_run_summary()
                 run = empty_run_summary()
+                history = []
                 repository_alerts.append(make_alert("WARNING", "NO_BATCH_DATA", "조회 가능한 배치가 없습니다.", source="MYSQL"))
         except PipelineRepositoryError:
+            all_runs = []
+            latest_run = empty_run_summary()
             run = empty_run_summary()
             history = []
-            repository_alerts.append(make_alert("CRITICAL", "MYSQL_UNAVAILABLE", "MySQL 배치 데이터를 조회할 수 없습니다.", source="MYSQL"))
+            repository_alerts.append(make_alert("CRITICAL", "MYSQL_UNAVAILABLE", "MySQL 전체 배치 데이터를 조회할 수 없습니다.", source="MYSQL"))
         else:
-            try:
-                history = self.mysql_repository.get_run_history(limit=60)
-            except PipelineRepositoryError:
-                history = []
-                repository_alerts.append(
-                    make_alert(
-                        "WARNING",
-                        "MYSQL_HISTORY_UNAVAILABLE",
-                        "현재 배치는 조회했지만 MySQL 배치 이력을 조회할 수 없습니다.",
-                        source="MYSQL",
-                        run_id=run["run_id"],
-                    )
-                )
+            if all_runs:
+                latest_run = all_runs[0]
+                run = aggregate_run_summaries(all_runs)
+                # Charts show only the latest 60 runs; KPI reconciliation uses
+                # every row returned from the MySQL dashboard View.
+                history = all_runs[:60]
 
         if run["run_id"] == "NO-BATCH":
             mongo_facts = empty_mongo_facts(run["run_id"])
             mongo_trend = {}
+            mongo_available = False
         else:
+            run_ids = list(
+                dict.fromkeys(
+                    str(item.get("run_id") or "")
+                    for item in all_runs
+                    if item.get("run_id")
+                )
+            )
             try:
-                mongo_facts = self.mongodb_repository.get_rejection_summary(run["run_id"])
+                mongo_facts = self.mongodb_repository.get_rejection_summary_for_runs(
+                    run_ids
+                )
             except MongoRepositoryError:
                 mongo_facts = empty_mongo_facts(run["run_id"])
                 mongo_trend = {}
-                repository_alerts.append(make_alert("CRITICAL", "MONGODB_UNAVAILABLE", "MongoDB rejected 데이터를 조회할 수 없습니다.", source="MONGODB", run_id=run["run_id"]))
+                mongo_available = False
+                repository_alerts.append(make_alert("CRITICAL", "MONGODB_UNAVAILABLE", "전체 run_id에 대한 MongoDB rejected 데이터를 조회할 수 없습니다.", source="MONGODB", run_id="ALL-RUNS"))
             else:
+                mongo_available = True
                 try:
                     mongo_trend = self.mongodb_repository.get_run_counts([item["run_id"] for item in history])
                 except MongoRepositoryError:
@@ -104,13 +115,29 @@ class MainDashboardService:
                             "MONGODB_TREND_UNAVAILABLE",
                             "현재 rejected 데이터는 조회했지만 MongoDB 배치 추이를 조회할 수 없습니다.",
                             source="MONGODB",
-                            run_id=run["run_id"],
+                            run_id="ALL-RUNS",
                         )
                     )
 
         mysql = build_mysql_dashboard_data(run, history)
         mongo = build_mongodb_dashboard_data(run, mongo_facts)
-        alerts = repository_alerts + evaluate_mysql_alerts(run, history, policy=self.alert_policy) + evaluate_mongodb_alerts(run, mongo_facts, policy=self.alert_policy)
+        mysql_alerts = (
+            evaluate_mysql_alerts(latest_run, history, policy=self.alert_policy)
+            if all_runs
+            else []
+        )
+        mongo_alerts = (
+            evaluate_mongodb_alerts(
+                run,
+                mongo_facts,
+                policy=self.alert_policy,
+                check_counts=False,
+            )
+            + evaluate_mongodb_run_alignment(all_runs, mongo_facts)
+            if mongo_available
+            else []
+        )
+        alerts = repository_alerts + mysql_alerts + mongo_alerts
         overall_status = alert_status(alerts)
 
         # Final accepted rows and actually stored rejected documents share the
@@ -124,7 +151,8 @@ class MainDashboardService:
         legacy = {
             "total_received": raw_count,
             "input_rate": 100.0 if raw_count else 0.0,
-            "latest_batch": run["run_id"],
+            "latest_batch": latest_run["run_id"],
+            "run_count": len(all_runs),
         }
         database_shares = {
             "mysql": {
@@ -137,12 +165,21 @@ class MainDashboardService:
                 "total": raw_count,
                 "rate": mongo_legacy_rate,
             },
+            "gold": {
+                "managers": run["manager_loaded_count"],
+                "target": run["manager_target_count"],
+                "rate": percentage(
+                    run["manager_loaded_count"],
+                    run["manager_target_count"],
+                    empty_value=100.0 if run["manager_loaded_count"] == 0 else 0.0,
+                ),
+            },
         }
 
-        event_time = _event_time(run)
+        event_time = _event_time(latest_run)
         pipeline_events = [
-            {"time": event_time, "label": f"배치 상태 {run['batch_status']}", "tone": "green" if run["batch_status"] == "SUCCESS" else "orange"},
-            {"time": event_time, "label": f"Final accepted {run['final_accepted_count']:,}건", "tone": "blue"},
+            {"time": event_time, "label": f"최근 배치 상태 {latest_run['batch_status']}", "tone": "green" if latest_run["batch_status"] == "SUCCESS" else "orange"},
+            {"time": event_time, "label": f"전체 {len(all_runs):,}개 run · Final accepted {run['final_accepted_count']:,}건", "tone": "blue"},
             {"time": event_time, "label": f"표준화 rejected 저장 {mongo['standardized']['rejected']:,}건", "tone": "purple"},
             {"time": event_time, "label": f"정규화 rejected 저장 {mongo['normalized']['rejected']:,}건", "tone": "purple"},
         ]
@@ -185,6 +222,7 @@ class MainDashboardService:
                     "mongoLoaded": mongo["load"]["loaded"],
                     "standardRejected": mongo["standardized"]["rejected"],
                     "normalRejected": mongo["normalized"]["rejected"],
+                    "goldManagers": run["manager_loaded_count"],
                     "overallRate": overall_load_rate,
                 },
                 "chart_payload": {

@@ -115,6 +115,7 @@ class MongoRepository:
     """
 
     STAGES = ("standardization", "normalization")
+    RUN_ID_QUERY_CHUNK_SIZE = 1000
 
     def __init__(self, client=None, database=None, data_mode=None):
         self._client = client
@@ -172,11 +173,9 @@ class MongoRepository:
     def _error_label(code):
         return ERROR_LABELS.get(code, code.replace("_", " ").title())
 
-    def _load_documents(self, run_id, stage):
-        if self.data_mode != "live":
-            return deepcopy(_sample_documents(run_id, stage))
-
-        projection = {
+    @staticmethod
+    def _document_projection():
+        return {
             "run_id": 1,
             "business_area_id": 1,
             "_source_row_number": 1,
@@ -187,11 +186,46 @@ class MongoRepository:
             "errors.reprocessable": 1,
             "errors.reprocess_status": 1,
         }
+
+    def _load_documents(self, run_id, stage):
+        if self.data_mode != "live":
+            return deepcopy(_sample_documents(run_id, stage))
+
         try:
             collection = self.database[self._collection_name(stage)]
-            return list(collection.find({"run_id": run_id}, projection))
+            return list(
+                collection.find(
+                    {"run_id": run_id},
+                    self._document_projection(),
+                )
+            )
         except Exception as exc:
             raise MongoRepositoryError(f"MongoDB {stage} rejected query failed.") from exc
+
+    def _load_documents_for_runs(self, run_ids, stage):
+        if self.data_mode != "live":
+            return [
+                document
+                for run_id in run_ids
+                for document in deepcopy(_sample_documents(run_id, stage))
+            ]
+
+        documents = []
+        try:
+            collection = self.database[self._collection_name(stage)]
+            for offset in range(0, len(run_ids), self.RUN_ID_QUERY_CHUNK_SIZE):
+                chunk = run_ids[offset : offset + self.RUN_ID_QUERY_CHUNK_SIZE]
+                documents.extend(
+                    collection.find(
+                        {"run_id": {"$in": chunk}},
+                        self._document_projection(),
+                    )
+                )
+            return documents
+        except Exception as exc:
+            raise MongoRepositoryError(
+                f"MongoDB {stage} rejected multi-run query failed."
+            ) from exc
 
     def _summarize_stage(self, run_id, stage, documents):
         error_counts = Counter()
@@ -199,15 +233,19 @@ class MongoRepository:
         column_counts = Counter()
         reprocess_counts = Counter()
         row_identifiers = Counter()
+        run_counts = defaultdict(lambda: {"rejected_rows": 0, "error_occurrences": 0})
         recent = []
         rows_without_errors = 0
         malformed_error_count = 0
-        run_started_at = _parse_run_id_started_at(run_id)
 
         for document_index, document in enumerate(documents):
+            document_run_id = str(document.get("run_id") or run_id or "")
+            document_started_at = _parse_run_id_started_at(document_run_id)
             source_row = document.get("_source_row_number")
             row_key = source_row if source_row is not None else f"document-{document_index}"
-            row_identifiers[str(row_key)] += 1
+            row_identifier = f"{document_run_id}:{row_key}"
+            row_identifiers[row_identifier] += 1
+            run_counts[document_run_id]["rejected_rows"] += 1
             errors = document.get("errors")
             if not isinstance(errors, list) or not errors:
                 rows_without_errors += 1
@@ -223,7 +261,8 @@ class MongoRepository:
                 code, malformed = self._normalize_error_code(raw_code, stage)
                 malformed_error_count += int(malformed)
                 error_counts[code] += 1
-                affected_rows[code].add(str(row_key))
+                affected_rows[code].add(row_identifier)
+                run_counts[document_run_id]["error_occurrences"] += 1
 
                 column = str(error.get("column") or "UNKNOWN_COLUMN")
                 column_counts[column] += 1
@@ -231,7 +270,8 @@ class MongoRepository:
                 reprocess_counts[reprocess_status] += 1
                 recent.append(
                     {
-                        "run_started_at": run_started_at,
+                        "run_id": document_run_id,
+                        "run_started_at": document_started_at,
                         "record": str(record_id),
                         "source_row_number": source_row,
                         "stage": stage,
@@ -252,6 +292,10 @@ class MongoRepository:
             "rows_without_errors": rows_without_errors,
             "malformed_error_count": malformed_error_count,
             "duplicate_document_count": duplicate_document_count,
+            "run_counts": {
+                current_run_id: dict(counts)
+                for current_run_id, counts in run_counts.items()
+            },
             "error_codes": [
                 {
                     "code": code,
@@ -272,10 +316,7 @@ class MongoRepository:
             "recent_rejections": recent,
         }
 
-    def get_rejection_summary(self, run_id):
-        if not run_id:
-            raise MongoRepositoryError("run_id is required for rejected-data queries.")
-
+    def _build_rejection_summary(self, run_ids, document_loader, result_run_id):
         stage_summaries = {}
         all_recent = []
         combined_codes = Counter()
@@ -284,8 +325,8 @@ class MongoRepository:
         combined_reprocess = Counter()
 
         for stage in self.STAGES:
-            documents = self._load_documents(run_id, stage)
-            summary = self._summarize_stage(run_id, stage, documents)
+            documents = document_loader(stage)
+            summary = self._summarize_stage(result_run_id, stage, documents)
             stage_summaries[stage] = summary
             all_recent.extend(summary["recent_rejections"])
             combined_codes.update(
@@ -310,8 +351,14 @@ class MongoRepository:
             reverse=True,
         )
         return {
-            "run_id": run_id,
-            "run_started_at": _parse_run_id_started_at(run_id),
+            "run_id": result_run_id,
+            "run_ids": list(run_ids),
+            "run_count": len(run_ids),
+            "run_started_at": (
+                _parse_run_id_started_at(result_run_id)
+                if len(run_ids) == 1
+                else None
+            ),
             "stages": stage_summaries,
             "total_rejected_rows": sum(item["rejected_rows"] for item in stage_summaries.values()),
             "total_error_occurrences": sum(item["error_occurrences"] for item in stage_summaries.values()),
@@ -337,6 +384,36 @@ class MongoRepository:
             ],
             "recent_rejections": all_recent[:20],
         }
+
+    def get_rejection_summary(self, run_id):
+        if not run_id:
+            raise MongoRepositoryError("run_id is required for rejected-data queries.")
+
+        normalized_run_id = str(run_id)
+        return self._build_rejection_summary(
+            [normalized_run_id],
+            lambda stage: self._load_documents(normalized_run_id, stage),
+            normalized_run_id,
+        )
+
+    def get_rejection_summary_for_runs(self, run_ids):
+        """Aggregate rejected documents matching every supplied MySQL run ID."""
+        normalized_run_ids = list(
+            dict.fromkeys(str(run_id) for run_id in run_ids if run_id)
+        )
+        if not normalized_run_ids:
+            raise MongoRepositoryError(
+                "At least one run_id is required for rejected-data queries."
+            )
+
+        return self._build_rejection_summary(
+            normalized_run_ids,
+            lambda stage: self._load_documents_for_runs(
+                normalized_run_ids,
+                stage,
+            ),
+            "ALL-RUNS",
+        )
 
     @staticmethod
     def _sample_index(run_id):

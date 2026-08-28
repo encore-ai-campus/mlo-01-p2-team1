@@ -22,6 +22,7 @@
             <a class="active" href="{% url 'datapipeline:main' %}"><span>01</span> 통합 관제</a>
             <a href="{% url 'datapipeline:mysql' %}"><span>02</span> MySQL</a>
             <a href="{% url 'datapipeline:mongodb' %}"><span>03</span> MongoDB</a>
+            <a href="{% url 'datapipeline:gold' %}"><span>04</span> Gold</a>
         </nav>
         <div class="system-cluster">
             <span class="demo-tag">{{ data_mode }}</span>
@@ -79,7 +80,7 @@
                 <div class="scene-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
                 <div class="scene-readout scene-readout-left"><small>CURRENT BATCH</small><strong>{{ legacy.latest_batch }}</strong></div>
                 <div class="scene-readout scene-readout-right"><small>GLOBAL LOAD RATE</small><strong>{{ overall_load_rate }}%</strong></div>
-                <canvas id="pipeline-scene" data-mysql-url="{% url 'datapipeline:mysql' %}" data-mongo-url="{% url 'datapipeline:mongodb' %}" aria-label="Legacy 수집부터 표준화, 정규화, MySQL 및 MongoDB 적재까지의 3D 파이프라인"></canvas>
+                <canvas id="pipeline-scene" data-mysql-url="{% url 'datapipeline:mysql' %}" data-mongo-url="{% url 'datapipeline:mongodb' %}" data-gold-url="{% url 'datapipeline:gold' %}" aria-label="Legacy 수집부터 표준화, 정규화, Gold Feature, MySQL 및 MongoDB 적재까지의 3D 파이프라인"></canvas>
                 <div class="webgl-fallback" id="webgl-fallback" hidden>
                     <strong>3D 렌더링을 사용할 수 없습니다.</strong><span>브라우저의 WebGL 2 지원 상태를 확인해 주세요.</span>
                 </div>
@@ -98,7 +99,9 @@
                 <i></i>
                 <article><span>03</span><div><small>NORMALIZATION</small><strong>{{ mysql.normalized.accepted|intcomma }}</strong></div><em>{{ mysql.normalized.rate }}%</em></article>
                 <i></i>
-                <article><span>04</span><div><small>DATABASE LOAD</small><strong>{{ total_loaded|intcomma }}</strong></div><em>{{ overall_load_rate }}%</em></article>
+                <article><span>04</span><div><small>GOLD FEATURES</small><strong>{{ database_shares.gold.managers|intcomma }}</strong></div><em>{{ database_shares.gold.rate }}%</em></article>
+                <i></i>
+                <article><span>05</span><div><small>DATABASE LOAD</small><strong>{{ total_loaded|intcomma }}</strong></div><em>{{ overall_load_rate }}%</em></article>
             </div>
         </section>
 
@@ -113,6 +116,12 @@
                 <div class="gateway-icon"><span>MO</span><i></i></div>
                 <div><small>REJECTED / LEGACY</small><h2>MongoDB</h2><p>{{ database_shares.mongodb.loaded|intcomma }} / {{ database_shares.mongodb.total|intcomma }}</p></div>
                 <strong>{{ database_shares.mongodb.rate }}%</strong><b>OPEN →</b>
+            </a>
+
+            <a class="database-gateway gold-gateway" href="{% url 'datapipeline:gold' %}">
+                <div class="gateway-icon"><span>AU</span><i></i></div>
+                <div><small>AI READY / MANAGERS</small><h2>Gold Medallion</h2><p>{{ database_shares.gold.managers|intcomma }} manager features</p></div>
+                <strong>{{ database_shares.gold.rate }}%</strong><b>EXPLORE →</b>
             </a>
 
             <section class="hud-panel chart-panel quality-orbit-panel">

@@ -87,6 +87,30 @@ class MySQLRepositoryTests(SimpleTestCase):
         repository.get_run_history(limit=101)
         self.assertEqual(cursor.execute.call_args.args[1], [100])
 
+    def test_live_all_run_query_has_no_limit_and_returns_every_view_row(self):
+        rows = []
+        for index in range(3):
+            row = {column: None for column in RUN_COLUMNS}
+            row.update(
+                {
+                    "run_id": f"run-{index}",
+                    "raw_row_count": index + 1,
+                    "batch_status": "SUCCESS",
+                }
+            )
+            rows.append(row)
+        connection, cursor = self._connection_with_rows(rows)
+        repository = PipelineRepository(connection=connection, data_mode="live")
+
+        result = repository.get_all_run_summaries()
+
+        self.assertEqual([item["run_id"] for item in result], ["run-0", "run-1", "run-2"])
+        sql, params = cursor.execute.call_args.args
+        self.assertIn("FROM dashboard_pipeline_run_view", sql)
+        self.assertIn("ORDER BY started_at DESC", sql)
+        self.assertNotIn("LIMIT", sql)
+        self.assertEqual(params, [])
+
     def test_query_failure_is_wrapped_in_repository_error(self):
         connection, cursor = self._connection_with_rows([])
         cursor.execute.side_effect = RuntimeError("database offline")
@@ -118,5 +142,6 @@ class MySQLRepositoryTests(SimpleTestCase):
             refreshed_time - timedelta(seconds=75),
         )
         self.assertEqual(len(repository.get_run_history(limit=3)), 3)
+        self.assertEqual(len(repository.get_all_run_summaries()), 60)
         self.assertEqual(repository.get_failed_runs(), [])
         connection.cursor.assert_not_called()
