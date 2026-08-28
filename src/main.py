@@ -17,6 +17,7 @@ from src.loader.mysql_loader import (
 from src.loader.write_rejected_rows_to_mongodb import (
     write_rejected_rows_to_mongodb,
 )
+from src.loader.update_mongodb_pipeline_status import update_pipeline_status
 from src.normailization.normalization import (
     count_rejection_reasons,
     run_normalization,
@@ -29,7 +30,6 @@ from src.normailization.reconciliation import (
 from src.standardization.do_standardization import do_standardization
 from src.standardization.get_raw_data_from_mongodb import (
     get_raw_data_from_mongoDB,
-    update_pipeline_status,
 )
 
 
@@ -294,9 +294,43 @@ def run_all(
     return result
 
 
+def print_pipeline_summary(completed: Mapping[str, Any]) -> None:
+    """전체 파이프라인의 처리 건수를 사람이 읽기 쉽게 출력한다."""
+    counts = completed["validation"]["counts"]
+    final_result = completed["final_result"]
+    mysql_load = completed["mysql_load"]
+
+    entity_names = ("manager", "top_area", "area")
+    loaded_counts = {
+        entity: mysql_load.get(f"{entity}_loaded_count", 0)
+        for entity in entity_names
+    }
+    total_loaded_count = sum(loaded_counts.values())
+
+    print("\n===== 파이프라인 처리 결과 =====")
+    print(f"실행 회차(run_id): {final_result['run_id']}")
+    print(f"원본 입력 행 수: {counts['raw_row_count']}")
+    print()
+    print("[1차 표준화]")
+    print(
+        "승인: "
+        f"{counts['standardization_accepted_row_count']}"
+    )
+    print(
+        "거절: "
+        f"{counts['standardization_rejected_row_count']}"
+    )
+    print()
+    print("[2차 정규화]")
+    print(f"최종 승인: {counts['final_accepted_row_count']}")
+    print(f"최종 거절: {counts['final_rejected_row_count']}")
+    print()
+    print("[최종 MySQL 적재 처리 건수]")
+    for entity in entity_names:
+        print(f"{entity}: {loaded_counts[entity]}")
+    print(f"RDB 적재 처리 합계: {total_loaded_count}")
+
+
 if __name__ == "__main__":
     completed = run_all()
-    print(completed["validation"])
-    print(completed["mysql_load"])
-    print(completed["mongodb_rejected_load"])
-    print(completed["pipeline_status_update"])
+    print_pipeline_summary(completed)
