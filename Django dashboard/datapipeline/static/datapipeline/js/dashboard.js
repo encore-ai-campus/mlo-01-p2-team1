@@ -38,7 +38,7 @@
         borderColor: "rgba(32, 217, 255, 0.35)",
         borderWidth: 1,
         padding: [8, 10],
-        textStyle: { color: "#d9f5ff", fontFamily, fontSize: 10 },
+        textStyle: { color: "#d9f5ff", fontFamily, fontSize: 11 },
         axisPointer: { type: "line", lineStyle: { color: "rgba(32, 217, 255, 0.3)" } },
         valueFormatter: (value) => `${new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 }).format(value)}${suffix}`,
     });
@@ -46,7 +46,7 @@
     const axisLabel = {
         color: colors.muted,
         fontFamily,
-        fontSize: 9,
+        fontSize: 10,
     };
 
     function lineOption(config) {
@@ -61,7 +61,7 @@
                 right: 10,
                 itemWidth: 12,
                 itemHeight: 2,
-                textStyle: { color: colors.muted, fontFamily, fontSize: 9 },
+                textStyle: { color: colors.muted, fontFamily, fontSize: 10 },
             },
             grid: { top: 42, right: 17, bottom: 28, left: 47, containLabel: false },
             xAxis: {
@@ -142,7 +142,7 @@
                 right: 8,
                 itemWidth: 10,
                 itemHeight: 5,
-                textStyle: { color: colors.muted, fontFamily, fontSize: 9 },
+                textStyle: { color: colors.muted, fontFamily, fontSize: 10 },
             } : { show: false },
             grid: horizontal
                 ? { top: 18, right: 22, bottom: 22, left: 98 }
@@ -180,14 +180,14 @@
                 subtext: config.centerLabel || "TOTAL",
                 left: "center",
                 top: "30%",
-                textStyle: { color: "#e3f8ff", fontFamily, fontSize: 20, fontWeight: 700 },
-                subtextStyle: { color: colors.muted, fontFamily, fontSize: 8, lineHeight: 16 },
+                textStyle: { color: "#e3f8ff", fontFamily, fontSize: 22, fontWeight: 700 },
+                subtextStyle: { color: colors.muted, fontFamily, fontSize: 9, lineHeight: 18 },
             },
             tooltip: {
                 trigger: "item",
                 backgroundColor: colors.tooltip,
                 borderColor: "rgba(168, 85, 247, 0.35)",
-                textStyle: { color: "#e8f8ff", fontFamily, fontSize: 10 },
+                textStyle: { color: "#e8f8ff", fontFamily, fontSize: 11 },
                 formatter: ({ name, value, percent }) => `${name}<br><b>${compactNumber(value)}</b> · ${percent}%`,
             },
             legend: {
@@ -196,7 +196,7 @@
                 itemWidth: 7,
                 itemHeight: 7,
                 itemGap: 12,
-                textStyle: { color: colors.muted, fontFamily, fontSize: 8 },
+                textStyle: { color: colors.muted, fontFamily, fontSize: 9 },
             },
             series: [{
                 name: config.centerLabel || "distribution",

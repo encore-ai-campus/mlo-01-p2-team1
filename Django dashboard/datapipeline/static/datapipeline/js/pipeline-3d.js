@@ -120,10 +120,10 @@ if (canvas && payloadNode) {
             context.stroke();
             context.textAlign = "center";
             context.fillStyle = "#e8faff";
-            context.font = "700 42px Arial";
+            context.font = "700 46px Arial";
             context.fillText(title, 384, 88);
             context.fillStyle = color;
-            context.font = "600 25px Consolas";
+            context.font = "600 28px Consolas";
             context.fillText(subtitle, 384, 132);
             const texture = new THREE.CanvasTexture(labelCanvas);
             texture.colorSpace = THREE.SRGBColorSpace;

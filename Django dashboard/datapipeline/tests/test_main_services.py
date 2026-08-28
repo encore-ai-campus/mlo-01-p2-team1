@@ -1,3 +1,6 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from django.test import SimpleTestCase
 
 from datapipeline.repository.mongodb_repository import MongoRepositoryError
@@ -29,7 +32,39 @@ class MainDashboardServiceTests(SimpleTestCase):
         self.assertEqual(context["overall_load_rate"], 100.0)
         self.assertEqual(context["pending_rows"], 0)
         self.assertEqual(context["scene_payload"]["mongoLoaded"], 3)
+        self.assertEqual(context["legacy"]["input_rate"], 100.0)
+        self.assertEqual(context["database_shares"]["mysql"]["rate"], 81.2)
+        self.assertEqual(context["database_shares"]["mongodb"]["rate"], 18.8)
+        self.assertEqual(
+            context["chart_payload"]["qualityDistribution"]["centerText"],
+            "81.2%",
+        )
         self.assertNotEqual(context["total_loaded"], 20 + 3)
+
+    def test_hourly_ingestion_groups_recent_raw_counts_in_kst(self):
+        kst = ZoneInfo("Asia/Seoul")
+        latest = make_run(
+            started_at=datetime(2026, 8, 28, 10, 20, tzinfo=kst),
+        )
+        same_hour = make_run(
+            started_at=datetime(2026, 8, 28, 10, 5, tzinfo=kst),
+        )
+        previous_hour = make_run(
+            started_at=datetime(2026, 8, 28, 9, 55, tzinfo=kst),
+        )
+        history = [latest, same_hour, previous_hour]
+        facts = make_mongo_facts(latest["run_id"])
+        mysql_repository = FakeMySQLRepository(latest, history)
+
+        context = MainDashboardService(
+            mysql_repository=mysql_repository,
+            mongodb_repository=FakeMongoRepository(facts),
+        ).get_dashboard()
+
+        chart = context["chart_payload"]["hourlyIngestionVolume"]
+        self.assertEqual(mysql_repository.history_calls, [60])
+        self.assertEqual(chart["labels"], ["08-28 09:00", "08-28 10:00"])
+        self.assertEqual(chart["datasets"][0]["values"], [16, 32])
 
     def test_main_status_uses_critical_over_warning(self):
         run = make_run()

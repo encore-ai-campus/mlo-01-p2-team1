@@ -6,10 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Legacy 수집부터 MySQL과 MongoDB 적재까지 3D로 관제하는 데이터 파이프라인 대시보드">
     <title>Data Pipeline Command Center</title>
-    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=3d4">
+    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=3d5">
     <script src="{% static 'datapipeline/vendor/echarts.min.js' %}?v=6.1.0" defer></script>
-    <script src="{% static 'datapipeline/js/dashboard.js' %}?v=3d2" defer></script>
-    <script type="module" src="{% static 'datapipeline/js/pipeline-3d.js' %}?v=3d5"></script>
+    <script src="{% static 'datapipeline/js/dashboard.js' %}?v=3d3" defer></script>
+    <script type="module" src="{% static 'datapipeline/js/pipeline-3d.js' %}?v=3d6"></script>
 </head>
 <body data-page="main">
     <div class="ambient-grid" aria-hidden="true"></div>
@@ -38,14 +38,14 @@
                 <div class="panel-title"><span>INGESTION MATRIX</span><b>LIVE</b></div>
                 <div class="metric-pair">
                     <div><small>LEGACY INPUT</small><strong>{{ legacy.total_received|intcomma }}</strong><span>records</span></div>
-                    <div><small>SOURCE DETAIL</small><strong>{{ legacy.source_count }}</strong><span>not provided</span></div>
+                    <div><small>INPUT RATE</small><strong>{{ legacy.input_rate }}%</strong><span>of legacy data</span></div>
                 </div>
-                <div class="scan-progress"><i style="--value:100%"></i></div>
+                <div class="scan-progress"><i style="--value:{{ legacy.input_rate }}%"></i></div>
             </section>
 
             <section class="hud-panel chart-panel">
-                <div class="panel-title"><span>SOURCE TELEMETRY</span><b>RECORDS</b></div>
-                <div class="echart chart-small" data-dashboard-chart="legacySourceVolume" role="img" aria-label="Legacy 소스별 수집량"></div>
+                <div class="panel-title"><span>HOURLY INGESTION</span><b>RAW RECORDS</b></div>
+                <div class="echart chart-small" data-dashboard-chart="hourlyIngestionVolume" role="img" aria-label="시간당 Legacy 원천 데이터 수집량"></div>
             </section>
 
             <section class="hud-panel chart-panel">
@@ -105,14 +105,14 @@
         <aside class="hud-column hud-right" aria-label="데이터베이스 및 품질 지표">
             <a class="database-gateway mysql-gateway" href="{% url 'datapipeline:mysql' %}">
                 <div class="gateway-icon"><span>MY</span><i></i></div>
-                <div><small>ACCEPTED STORAGE</small><h2>MySQL</h2><p>{{ mysql.load.loaded|intcomma }} / {{ mysql.load.expected|intcomma }}</p></div>
-                <strong>{{ mysql.load.rate }}%</strong><b>OPEN →</b>
+                <div><small>ACCEPTED / LEGACY</small><h2>MySQL</h2><p>{{ database_shares.mysql.loaded|intcomma }} / {{ database_shares.mysql.total|intcomma }}</p></div>
+                <strong>{{ database_shares.mysql.rate }}%</strong><b>OPEN →</b>
             </a>
 
             <a class="database-gateway mongo-gateway" href="{% url 'datapipeline:mongodb' %}">
                 <div class="gateway-icon"><span>MO</span><i></i></div>
-                <div><small>REJECTED STORAGE</small><h2>MongoDB</h2><p>{{ mongo.load.loaded|intcomma }} / {{ mongo.load.expected|intcomma }}</p></div>
-                <strong>{{ mongo.load.rate }}%</strong><b>OPEN →</b>
+                <div><small>REJECTED / LEGACY</small><h2>MongoDB</h2><p>{{ database_shares.mongodb.loaded|intcomma }} / {{ database_shares.mongodb.total|intcomma }}</p></div>
+                <strong>{{ database_shares.mongodb.rate }}%</strong><b>OPEN →</b>
             </a>
 
             <section class="hud-panel chart-panel quality-orbit-panel">

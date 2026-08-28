@@ -31,7 +31,7 @@ html {
     color: var(--text);
     background: var(--void);
     font-family: var(--font-ui);
-    font-size: 15px;
+    font-size: 16.5px;
 }
 
 body {
@@ -205,22 +205,30 @@ button { color: inherit; font: inherit; }
 .warning-signal-tray {
     display: flex;
     width: min(1580px, calc(100% - 28px));
-    min-height: 34px;
+    min-height: 38px;
     align-items: center;
     gap: 12px;
     margin: 8px auto 0;
-    padding: 7px 12px;
+    padding: 8px 13px;
     overflow: hidden;
     border: 1px solid rgba(245, 158, 11, 0.32);
     background: rgba(245, 158, 11, 0.07);
     color: #d8e9ef;
     font: 0.52rem var(--font-mono);
     letter-spacing: 0.03em;
+    will-change: border-color, background-color, box-shadow;
+}
+.warning-signal-tray.status-warning {
+    animation: warningTrayBlink 1.8s ease-in-out infinite;
 }
 .warning-signal-tray > strong { color: #ffc96a; letter-spacing: 0.12em; }
 .warning-signal-tray > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .warning-signal-tray > span b { margin-right: 4px; color: #f5ad38; }
-.warning-signal-tray.status-critical { border-color: rgba(244, 63, 94, 0.38); background: rgba(244, 63, 94, 0.08); }
+.warning-signal-tray.status-critical {
+    border-color: rgba(244, 63, 94, 0.38);
+    background: rgba(244, 63, 94, 0.08);
+    animation: criticalTrayBlink 1.05s ease-in-out infinite;
+}
 .warning-signal-tray.status-critical > strong,
 .warning-signal-tray.status-critical > span b { color: #ff7893; }
 
@@ -641,6 +649,30 @@ button { color: inherit; font: inherit; }
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.68); } }
 @keyframes travel { from { left: 0; } to { left: calc(100% - 5px); } }
 @keyframes signalWave { from { transform: scaleY(0.55); opacity: 0.55; } to { transform: scaleY(1); opacity: 1; } }
+@keyframes warningTrayBlink {
+    0%, 100% {
+        border-color: rgba(245, 158, 11, 0.34);
+        background: rgba(245, 158, 11, 0.07);
+        box-shadow: 0 0 0 rgba(245, 158, 11, 0);
+    }
+    50% {
+        border-color: rgba(245, 158, 11, 0.82);
+        background: rgba(245, 158, 11, 0.16);
+        box-shadow: 0 0 20px rgba(245, 158, 11, 0.28), inset 0 0 18px rgba(245, 158, 11, 0.08);
+    }
+}
+@keyframes criticalTrayBlink {
+    0%, 100% {
+        border-color: rgba(244, 63, 94, 0.4);
+        background: rgba(244, 63, 94, 0.08);
+        box-shadow: 0 0 0 rgba(244, 63, 94, 0);
+    }
+    50% {
+        border-color: rgba(255, 70, 103, 0.95);
+        background: rgba(244, 63, 94, 0.2);
+        box-shadow: 0 0 24px rgba(244, 63, 94, 0.38), inset 0 0 22px rgba(244, 63, 94, 0.1);
+    }
+}
 
 @media (max-width: 1360px) {
     .command-layout { grid-template-columns: 235px minmax(520px, 1fr) 250px; gap: 8px; padding: 8px; }

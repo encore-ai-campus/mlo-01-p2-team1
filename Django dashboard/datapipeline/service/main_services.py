@@ -24,6 +24,23 @@ def _event_time(run):
     return timezone.localtime(started_at).strftime("%H:%M") if started_at else "--:--"
 
 
+def _hourly_ingestion(history):
+    """Aggregate raw input counts into KST hour buckets."""
+    buckets = {}
+    for item in history:
+        started_at = run_started_at(item)
+        if started_at is None:
+            continue
+        hour = timezone.localtime(started_at).replace(minute=0, second=0, microsecond=0)
+        buckets[hour] = buckets.get(hour, 0) + item["raw_row_count"]
+
+    ordered = sorted(buckets.items())
+    return {
+        "labels": [hour.strftime("%m-%d %H:00") for hour, _ in ordered],
+        "values": [count for _, count in ordered],
+    }
+
+
 class MainDashboardService:
     """Combine MySQL pipeline facts and MongoDB rejected-data facts."""
 
@@ -53,7 +70,7 @@ class MainDashboardService:
             repository_alerts.append(make_alert("CRITICAL", "MYSQL_UNAVAILABLE", "MySQL 배치 데이터를 조회할 수 없습니다.", source="MYSQL"))
         else:
             try:
-                history = self.mysql_repository.get_run_history(limit=12)
+                history = self.mysql_repository.get_run_history(limit=60)
             except PipelineRepositoryError:
                 history = []
                 repository_alerts.append(
@@ -102,17 +119,24 @@ class MainDashboardService:
         raw_count = run["raw_row_count"]
         overall_load_rate = percentage(accounted_rows, raw_count)
         pending_rows = max(raw_count - accounted_rows, 0)
+        mysql_legacy_rate = percentage(run["final_accepted_count"], raw_count)
+        mongo_legacy_rate = percentage(mongo["load"]["loaded"], raw_count)
         legacy = {
-            "source_count": "N/A",
             "total_received": raw_count,
+            "input_rate": 100.0 if raw_count else 0.0,
             "latest_batch": run["run_id"],
-            "sources": [
-                {
-                    "name": "RAW BATCH TOTAL",
-                    "records": raw_count,
-                    "state": run["batch_status"],
-                }
-            ],
+        }
+        database_shares = {
+            "mysql": {
+                "loaded": run["final_accepted_count"],
+                "total": raw_count,
+                "rate": mysql_legacy_rate,
+            },
+            "mongodb": {
+                "loaded": mongo["load"]["loaded"],
+                "total": raw_count,
+                "rate": mongo_legacy_rate,
+            },
         }
 
         event_time = _event_time(run)
@@ -132,7 +156,9 @@ class MainDashboardService:
                 },
             )
 
-        history_for_chart = list(reversed(history))
+        chart_history = history or ([] if run["run_id"] == "NO-BATCH" else [run])
+        history_for_chart = list(reversed(chart_history))
+        hourly_ingestion = _hourly_ingestion(chart_history)
         labels = [
             timezone.localtime(run_started_at(item)).strftime("%H:%M") if run_started_at(item) else "--:--"
             for item in history_for_chart
@@ -146,6 +172,7 @@ class MainDashboardService:
                 "overall_load_rate": overall_load_rate,
                 "total_loaded": accounted_rows,
                 "pending_rows": pending_rows,
+                "database_shares": database_shares,
                 "alerts": alerts,
                 "overall_status": overall_status,
                 "overall_status_label": "정상" if overall_status == "NORMAL" else "경고" if overall_status == "WARNING" else "위험",
@@ -173,14 +200,13 @@ class MainDashboardService:
                         "type": "doughnut",
                         "labels": ["MySQL accepted", "MongoDB rejected", "미대사"],
                         "datasets": [{"values": [run["final_accepted_count"], mongo["load"]["loaded"], pending_rows], "colors": ["#14b8a6", "#8b5cf6", "#e2e8f0"]}],
-                        "centerText": f"{overall_load_rate}%",
-                        "centerLabel": "행 기준 대사율",
+                        "centerText": f"{mysql_legacy_rate}%",
+                        "centerLabel": "FINAL ACCEPTED",
                     },
-                    "legacySourceVolume": {
+                    "hourlyIngestionVolume": {
                         "type": "bar",
-                        "horizontal": True,
-                        "labels": [source["name"] for source in legacy["sources"]],
-                        "datasets": [{"label": "수집량", "color": "#20d9ff", "values": [source["records"] for source in legacy["sources"]]}],
+                        "labels": hourly_ingestion["labels"],
+                        "datasets": [{"label": "시간당 원천 수집량", "color": "#20d9ff", "values": hourly_ingestion["values"]}],
                     },
                     "rejectReasonVolume": {
                         "type": "bar",

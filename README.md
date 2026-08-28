@@ -4,6 +4,8 @@ Legacy 데이터 수집 → 표준화 → 정규화 → MySQL/MongoDB 적재 흐
 
 통합 화면의 중앙 파이프라인은 Three.js 3D 장면으로, 주변 및 상세 분석 패널은 Apache ECharts로 렌더링합니다. 라이브러리는 CDN이 아니라 `datapipeline/static/datapipeline/vendor/`에 고정되어 있습니다.
 
+화면별 지표, 계산식, Live 확인 결과와 디자인 설명은 [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md)를 참고하세요.
+
 ## 화면 URL
 
 - 통합 관제: `http://127.0.0.1:8000/dashboard/`
