@@ -53,7 +53,7 @@ if DASHBOARD_DATA_MODE not in {"sample", "live"}:
 
 GOLD_DASHBOARD_VIEW = os.getenv(
     "GOLD_DASHBOARD_VIEW",
-    "dashboard_gold_manager_view",
+    "dashboard_gold_manager_assignment_view",
 ).strip()
 
 

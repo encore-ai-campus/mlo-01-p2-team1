@@ -86,7 +86,7 @@ class GoldRepository:
     outlier signals and presentation shaping belong to ``gold_services``.
     """
 
-    DEFAULT_VIEW_NAME = "dashboard_gold_manager_view"
+    DEFAULT_VIEW_NAME = "dashboard_gold_manager_assignment_view"
 
     def __init__(self, connection=None, data_mode=None, view_name=None):
         self._connection = connection

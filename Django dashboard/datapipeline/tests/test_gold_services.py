@@ -30,7 +30,7 @@ def make_gold_row(manager_id="EMP000001", **overrides):
 
 
 class FakeGoldRepository:
-    view_name = "dashboard_gold_manager_view"
+    view_name = "dashboard_gold_manager_assignment_view"
 
     def __init__(self, rows=None, error=None):
         self.rows = deepcopy(rows or [])
@@ -100,3 +100,16 @@ class GoldServiceTests(SimpleTestCase):
         self.assertEqual(context["overall_status"], "CRITICAL")
         self.assertEqual(context["alerts"][0]["code"], "GOLD_VIEW_UNAVAILABLE")
         self.assertEqual(context["source_status"], "VIEW WAITING")
+
+    def test_dashboard_service_returns_live_view_rows_to_browser_contract(self):
+        rows = [make_gold_row(), make_gold_row("EMP000002")]
+        repository = FakeGoldRepository(rows=rows)
+
+        context = GoldDashboardService(gold_repository=repository).get_dashboard()
+
+        self.assertEqual(repository.calls, [2000])
+        self.assertEqual(context["view_name"], "dashboard_gold_manager_assignment_view")
+        self.assertEqual(context["source_status"], "SYNCHRONIZED")
+        self.assertEqual(context["gold"]["total_managers"], 2)
+        self.assertEqual(len(context["feature_payload"]), 2)
+        self.assertEqual(len(context["scene_payload"]["managers"]), 2)

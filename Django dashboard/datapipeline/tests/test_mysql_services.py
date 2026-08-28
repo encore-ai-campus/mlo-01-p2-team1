@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone as datetime_timezone
+from zoneinfo import ZoneInfo
 
 from django.test import SimpleTestCase
 
@@ -8,6 +9,7 @@ from datapipeline.service.mysql_services import (
     MySQLDashboardService,
     alert_status,
     build_mysql_dashboard_data,
+    build_mysql_load_rate_telemetry,
     evaluate_mysql_alerts,
     percentage,
 )
@@ -158,8 +160,44 @@ class MySQLServiceRuleTests(SimpleTestCase):
 
         self.assertEqual(data["standardized"]["rate"], 87.5)
         self.assertEqual(data["normalized"]["rate"], 92.9)
-        self.assertEqual(data["load"]["rate"], 100.0)
+        self.assertEqual(data["load"]["loaded"], 13)
+        self.assertEqual(data["load"]["expected"], 16)
+        self.assertEqual(data["load"]["rate"], 81.2)
+        self.assertEqual(data["entity_load"]["rate"], 100.0)
         self.assertEqual(data["recent_batches"][0]["duration"], "00:30")
+
+    def test_load_rate_telemetry_uses_weighted_kst_half_hour_buckets(self):
+        kst = ZoneInfo("Asia/Seoul")
+        history = [
+            make_run(
+                started_at=datetime(2026, 8, 28, 10, 29, tzinfo=kst),
+                raw_row_count=30,
+                final_accepted_count=24,
+            ),
+            make_run(
+                started_at=datetime(2026, 8, 28, 10, 1, tzinfo=kst),
+                raw_row_count=10,
+                final_accepted_count=5,
+            ),
+            make_run(
+                started_at=datetime(2026, 8, 28, 10, 59, tzinfo=kst),
+                raw_row_count=10,
+                final_accepted_count=10,
+            ),
+            make_run(
+                started_at=datetime(2026, 8, 28, 10, 30, tzinfo=kst),
+                raw_row_count=20,
+                final_accepted_count=10,
+            ),
+        ]
+
+        telemetry = build_mysql_load_rate_telemetry(history)
+
+        self.assertEqual(
+            telemetry["labels"],
+            ["08-28 10:00", "08-28 10:30"],
+        )
+        self.assertEqual(telemetry["values"], [72.5, 66.7])
 
 
 class MySQLDashboardServiceTests(SimpleTestCase):
@@ -170,7 +208,7 @@ class MySQLDashboardServiceTests(SimpleTestCase):
         context = MySQLDashboardService(mysql_repository=repository).get_dashboard(run["run_id"])
 
         self.assertEqual(repository.summary_calls, [run["run_id"]])
-        self.assertEqual(repository.history_calls, [12])
+        self.assertEqual(repository.history_calls, [60])
         self.assertEqual(context["mysql"]["run"]["run_id"], run["run_id"])
         self.assertEqual(context["chart_payload"]["mysqlLoadTrend"]["type"], "line")
 

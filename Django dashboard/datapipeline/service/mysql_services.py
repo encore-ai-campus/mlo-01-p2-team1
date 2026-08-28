@@ -48,6 +48,33 @@ def run_started_at(run):
     return _aware(run.get("started_at")) or parse_run_id_started_at(run.get("run_id"))
 
 
+def build_mysql_load_rate_telemetry(history):
+    """Aggregate Final accepted/raw rates into KST clock-aligned 30m buckets."""
+    buckets = {}
+    for run in history:
+        started_at = run_started_at(run)
+        if started_at is None:
+            continue
+        local_started_at = timezone.localtime(started_at)
+        bucket = local_started_at.replace(
+            minute=0 if local_started_at.minute < 30 else 30,
+            second=0,
+            microsecond=0,
+        )
+        facts = buckets.setdefault(bucket, {"raw": 0, "loaded": 0})
+        facts["raw"] += int(run.get("raw_row_count") or 0)
+        facts["loaded"] += int(run.get("final_accepted_count") or 0)
+
+    ordered = sorted(buckets.items())
+    return {
+        "labels": [bucket.strftime("%m-%d %H:%M") for bucket, _ in ordered],
+        "values": [
+            percentage(facts["loaded"], facts["raw"])
+            for _, facts in ordered
+        ],
+    }
+
+
 def _duration_seconds(run):
     started_at = run_started_at(run)
     completed_at = _aware(run.get("completed_at"))
@@ -265,12 +292,6 @@ def build_mysql_dashboard_data(run, history=None, now=None):
         }
         for item in history[:8]
     ]
-    hourly_rate = []
-    for item in reversed(history):
-        expected = item["manager_target_count"] + item["top_area_target_count"] + item["area_target_count"]
-        loaded = item["manager_loaded_count"] + item["top_area_loaded_count"] + item["area_loaded_count"]
-        hourly_rate.append(percentage(loaded, expected, empty_value=100.0 if loaded == 0 else 0.0))
-
     return {
         "run": run,
         "standardized": {
@@ -288,6 +309,11 @@ def build_mysql_dashboard_data(run, history=None, now=None):
             "normalization": run["final_rejected_count"],
         },
         "load": {
+            "loaded": final_accepted,
+            "expected": raw_count,
+            "rate": percentage(final_accepted, raw_count),
+        },
+        "entity_load": {
             "loaded": total_loaded,
             "expected": total_expected,
             "rate": percentage(total_loaded, total_expected, empty_value=100.0 if total_loaded == 0 else 0.0),
@@ -295,7 +321,6 @@ def build_mysql_dashboard_data(run, history=None, now=None):
         "freshness": _format_freshness(run, now=now),
         "tables": tables,
         "recent_batches": recent_batches,
-        "hourly_rate": hourly_rate,
         "batch_status": run["batch_status"],
         "error_message": run.get("error_message"),
     }
@@ -337,10 +362,10 @@ class MySQLDashboardService:
             repository_alerts.append(make_alert("CRITICAL", "MYSQL_UNAVAILABLE", "MySQL 배치 데이터를 조회할 수 없습니다.", source="MYSQL", run_id=run_id))
         else:
             if aggregate_scope:
-                history = all_runs[:12]
+                history = all_runs[:60]
             else:
                 try:
-                    history = self.mysql_repository.get_run_history(limit=12)
+                    history = self.mysql_repository.get_run_history(limit=60)
                 except PipelineRepositoryError:
                     history = []
                     repository_alerts.append(
@@ -362,7 +387,7 @@ class MySQLDashboardService:
         )
         alerts = repository_alerts + mysql_alerts
         status = alert_status(alerts)
-        history_for_chart = list(reversed(history))
+        load_rate_telemetry = build_mysql_load_rate_telemetry(history)
         stage_rejected = run["standardization_rejected_count"] + run["final_rejected_count"]
         unaccounted = max(run["raw_row_count"] - run["final_accepted_count"] - stage_rejected, 0)
 
@@ -383,16 +408,13 @@ class MySQLDashboardService:
                 "chart_payload": {
                     "mysqlLoadTrend": {
                         "type": "line",
-                        "labels": [
-                            timezone.localtime(run_started_at(item)).strftime("%H:%M") if run_started_at(item) else "--:--"
-                            for item in history_for_chart
-                        ],
-                        "datasets": [{"label": "적재율", "color": "#f59e0b", "fill": True, "values": mysql["hourly_rate"]}],
+                        "labels": load_rate_telemetry["labels"],
+                        "datasets": [{"label": "Final accepted / Legacy", "color": "#f59e0b", "fill": True, "values": load_rate_telemetry["values"]}],
                         "suffix": "%",
                     },
                     "mysqlStageVolume": {
                         "type": "bar",
-                        "labels": ["수집", "표준화 승인", "최종 승인", "엔터티 적재"],
+                        "labels": ["수집", "표준화 승인", "최종 승인", "MySQL 적재"],
                         "datasets": [{"label": "레코드", "color": "#14b8a6", "values": [run["raw_row_count"], run["standardization_accepted_count"], run["final_accepted_count"], mysql["load"]["loaded"]]}],
                     },
                     "mysqlTableLoad": {
@@ -407,7 +429,7 @@ class MySQLDashboardService:
                         "labels": ["Final accepted", "Rejected", "미대사"],
                         "datasets": [{"values": [run["final_accepted_count"], stage_rejected, unaccounted], "colors": ["#15e6c1", "#a855f7", "#f59e0b"]}],
                         "centerText": f"{mysql['load']['rate']}%",
-                        "centerLabel": "엔터티 적재율",
+                        "centerLabel": "FINAL ACCEPTED",
                     },
                 },
             }

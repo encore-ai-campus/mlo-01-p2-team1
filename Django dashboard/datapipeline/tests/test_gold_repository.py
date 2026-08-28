@@ -47,7 +47,7 @@ class GoldRepositoryTests(SimpleTestCase):
         self.assertEqual(result[0]["managed_area_count"], 3)
         self.assertEqual(result[0]["average_area_age_days"], 800.2)
         sql, params = cursor.execute.call_args.args
-        self.assertIn("FROM dashboard_gold_manager_view", sql)
+        self.assertIn("FROM dashboard_gold_manager_assignment_view", sql)
         self.assertIn("ORDER BY managed_area_count DESC", sql)
         self.assertEqual(params, [10])
 
