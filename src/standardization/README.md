@@ -75,7 +75,7 @@ result = do_standardization(
 )
 ```
 
-운영 환경에서는 프로젝트 루트의 `requirements.txt`에 있는 PyYAML 의존성을
-설치한다. 예: `python -m pip install -r requirements.txt`. 동일한 입력, 규칙 파일, 코드 버전으로 같은 `run_id`를 재실행하면
+운영 환경에서는 `src/standardization/requirements.txt`의 PyYAML 의존성을
+설치한다. 동일한 입력, 규칙 파일, 코드 버전으로 같은 `run_id`를 재실행하면
 기존 산출물을 변경하지 않고 반환한다. 같은 `run_id`에 다른 입력이 들어오면
 기존 결과의 덮어쓰기를 막기 위해 실행을 실패시킨다.
