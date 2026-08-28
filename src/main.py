@@ -33,6 +33,10 @@ from src.standardization.get_raw_data_from_mongodb import (
 )
 
 
+class NoPendingRunError(RuntimeError):
+    """처리할 pending run_id가 더 이상 없을 때 발생한다."""
+
+
 def keep_standardization_contract(result):
     """표준화 결과에서 팀이 합의한 다섯 값만 다음 단계로 넘긴다."""
     missing = [key for key in STANDARDIZATION_RESULT_KEYS if key not in result]
@@ -186,6 +190,8 @@ def run_all(
 ):
     """Mongo 원본 조회부터 MySQL 적재와 배치 사실 기록까지만 실행한다."""
     raw_documents = raw_data_reader()
+    if not raw_documents:
+        raise NoPendingRunError("처리할 pending run_id가 없습니다.")
     raw_row_count = len(raw_documents)
     standardization_payload = build_standardization_payload(raw_documents)
     run_id = standardization_payload["manifest"]["run_id"]
@@ -294,6 +300,36 @@ def run_all(
     return result
 
 
+def run_until_no_pending(
+    output_dir="outputs",
+    *,
+    max_runs: int | None = None,
+    **run_all_kwargs,
+) -> list[dict[str, Any]]:
+    """pending run_id가 없어질 때까지 run_all을 반복 실행한다.
+
+    각 반복마다 기본 raw_data_reader가 MongoDB를 다시 조회하므로,
+    성공 처리된 run_id는 다음 반복에서 제외되고 다음 pending run_id가
+    선택된다. 어느 한 배치라도 실패하면 해당 예외를 그대로 올려 즉시
+    중단한다. ``max_runs``는 로컬 점검이나 안전 제한이 필요할 때 사용한다.
+    """
+    if max_runs is not None and max_runs < 1:
+        raise ValueError("max_runs는 1 이상의 정수여야 합니다.")
+
+    completed_runs: list[dict[str, Any]] = []
+    while max_runs is None or len(completed_runs) < max_runs:
+        try:
+            completed_runs.append(
+                run_all(
+                    output_dir=output_dir,
+                    **run_all_kwargs,
+                )
+            )
+        except NoPendingRunError:
+            break
+    return completed_runs
+
+
 def print_pipeline_summary(completed: Mapping[str, Any]) -> None:
     """전체 파이프라인의 처리 건수를 사람이 읽기 쉽게 출력한다."""
     counts = completed["validation"]["counts"]
@@ -332,5 +368,11 @@ def print_pipeline_summary(completed: Mapping[str, Any]) -> None:
 
 
 if __name__ == "__main__":
-    completed = run_all()
-    print_pipeline_summary(completed)
+    completed_runs = run_until_no_pending()
+    if not completed_runs:
+        print("처리할 pending run_id가 없습니다.")
+    else:
+        for batch_number, completed in enumerate(completed_runs, start=1):
+            print(f"\n===== {batch_number}번째 run_id 처리 완료 =====")
+            print_pipeline_summary(completed)
+        print(f"\n총 처리 run_id 수: {len(completed_runs)}")
