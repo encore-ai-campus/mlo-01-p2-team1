@@ -179,6 +179,26 @@ class PipelineRepository:
         )
         return [self._normalize_row(row) for row in rows]
 
+    def get_all_run_summaries(self):
+        """Return every batch row used by the integrated dashboard.
+
+        The main dashboard reconciles MongoDB documents against the complete
+        set of MySQL run IDs. Detail dashboards continue to use the bounded
+        history methods above so their charts stay compact.
+        """
+        if self.data_mode != "live":
+            return [
+                deepcopy(_sample_run(index, anchor=self._sample_anchor))
+                for index in range(60)
+            ]
+
+        rows = self._fetch_all(
+            f"SELECT {', '.join(RUN_COLUMNS)} "
+            f"FROM {self.VIEW_NAME} "
+            "ORDER BY started_at DESC"
+        )
+        return [self._normalize_row(row) for row in rows]
+
     def get_failed_runs(self, limit=10):
         safe_limit = max(1, min(int(limit), 100))
         if self.data_mode != "live":

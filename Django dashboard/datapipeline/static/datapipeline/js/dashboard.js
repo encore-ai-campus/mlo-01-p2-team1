@@ -222,10 +222,120 @@
         };
     }
 
+    const escapeHtml = (value) => String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+    function scatterOption(config) {
+        return {
+            animationDuration: 1000,
+            animationEasing: "cubicOut",
+            tooltip: {
+                trigger: "item",
+                backgroundColor: colors.tooltip,
+                borderColor: "rgba(247, 201, 72, 0.45)",
+                borderWidth: 1,
+                textStyle: { color: "#effbff", fontFamily, fontSize: 11 },
+                formatter: ({ data }) => {
+                    const value = data?.value || [];
+                    return [
+                        `<b>${escapeHtml(data?.managerId || "MANAGER")}</b>`,
+                        escapeHtml(data?.department || ""),
+                        `근속 ${escapeHtml(value[0] || 0)}년`,
+                        `Area ${escapeHtml(value[1] || 0)} · Top ${escapeHtml(value[2] || 0)}`,
+                    ].join("<br>");
+                },
+            },
+            grid: { top: 22, right: 24, bottom: 46, left: 54 },
+            xAxis: {
+                type: "value",
+                name: config.xLabel || "X",
+                nameLocation: "middle",
+                nameGap: 30,
+                nameTextStyle: { color: colors.muted, fontFamily, fontSize: 10 },
+                axisLine: { lineStyle: { color: "rgba(71, 119, 143, 0.2)" } },
+                axisTick: { show: false },
+                axisLabel,
+                splitLine: { lineStyle: { color: colors.grid } },
+            },
+            yAxis: {
+                type: "value",
+                name: config.yLabel || "Y",
+                nameTextStyle: { color: colors.muted, fontFamily, fontSize: 10 },
+                axisLine: { show: false },
+                axisTick: { show: false },
+                axisLabel,
+                splitLine: { lineStyle: { color: colors.grid } },
+            },
+            series: config.datasets.map((dataset) => ({
+                name: dataset.label,
+                type: "scatter",
+                data: dataset.values,
+                symbolSize: (value) => 8 + Math.min(21, Number(value?.[2] || 0) * 3.2),
+                itemStyle: {
+                    color: (params) => params.data?.crossTop ? "#f7c948" : dataset.color,
+                    opacity: 0.76,
+                    borderColor: "rgba(255,255,255,0.72)",
+                    borderWidth: 0.7,
+                    shadowBlur: 10,
+                    shadowColor: dataset.color,
+                },
+                emphasis: { scale: 1.7, itemStyle: { opacity: 1, shadowBlur: 22 } },
+            })),
+        };
+    }
+
+    function radarOption(config) {
+        return {
+            animationDuration: 1000,
+            color: config.datasets.map((dataset) => dataset.color),
+            tooltip: {
+                trigger: "item",
+                backgroundColor: colors.tooltip,
+                borderColor: "rgba(247, 201, 72, 0.4)",
+                textStyle: { color: "#effbff", fontFamily, fontSize: 11 },
+            },
+            legend: {
+                top: 8,
+                right: 10,
+                itemWidth: 12,
+                itemHeight: 3,
+                textStyle: { color: colors.muted, fontFamily, fontSize: 10 },
+            },
+            radar: {
+                center: ["50%", "55%"],
+                radius: "66%",
+                splitNumber: 4,
+                indicator: config.indicators,
+                axisName: { color: "#789caf", fontFamily, fontSize: 10 },
+                axisLine: { lineStyle: { color: "rgba(32, 217, 255, 0.16)" } },
+                splitLine: { lineStyle: { color: "rgba(32, 217, 255, 0.14)" } },
+                splitArea: { areaStyle: { color: ["rgba(8,24,40,0.24)", "rgba(8,24,40,0.04)"] } },
+            },
+            series: [{
+                type: "radar",
+                symbol: "circle",
+                symbolSize: 4,
+                data: config.datasets.map((dataset) => ({
+                    name: dataset.label,
+                    value: dataset.values,
+                    lineStyle: { width: 2, color: dataset.color },
+                    itemStyle: { color: dataset.color },
+                    areaStyle: { color: dataset.color, opacity: 0.11 },
+                })),
+            }],
+        };
+    }
+
     function buildOption(config) {
         if (config.type === "line") return lineOption(config);
         if (config.type === "bar") return barOption(config);
         if (config.type === "doughnut") return doughnutOption(config);
+        if (config.type === "scatter") return scatterOption(config);
+        if (config.type === "radar") return radarOption(config);
         return {};
     }
 
@@ -245,6 +355,12 @@
                 textStyle: { fontFamily },
                 aria: { enabled: true },
                 ...buildOption(config),
+            });
+            chart.on("click", ({ data }) => {
+                if (!data?.managerId) return;
+                window.dispatchEvent(new CustomEvent("gold:manager-selected", {
+                    detail: { managerId: data.managerId },
+                }));
             });
             chartInstances.push(chart);
         });

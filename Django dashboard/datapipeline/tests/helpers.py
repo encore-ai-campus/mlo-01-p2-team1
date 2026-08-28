@@ -55,8 +55,20 @@ def make_mongo_facts(
     )
     facts["stages"]["standardization"]["rejected_rows"] = standard_rows
     facts["stages"]["standardization"]["error_occurrences"] = standard_errors
+    facts["stages"]["standardization"]["run_counts"] = {
+        run_id: {
+            "rejected_rows": standard_rows,
+            "error_occurrences": standard_errors,
+        }
+    }
     facts["stages"]["normalization"]["rejected_rows"] = normalization_rows
     facts["stages"]["normalization"]["error_occurrences"] = normalization_errors
+    facts["stages"]["normalization"]["run_counts"] = {
+        run_id: {
+            "rejected_rows": normalization_rows,
+            "error_occurrences": normalization_errors,
+        }
+    }
     facts["total_rejected_rows"] = standard_rows + normalization_rows
     facts["total_error_occurrences"] = standard_errors + normalization_errors
     facts["error_codes"] = deepcopy(error_codes or [])
@@ -68,12 +80,14 @@ def make_mongo_facts(
 
 
 class FakeMySQLRepository:
-    def __init__(self, run=None, history=None, *, current_error=None, history_error=None):
+    def __init__(self, run=None, history=None, *, current_error=None, history_error=None, all_error=None):
         self.run = deepcopy(run)
         self.history = deepcopy(history if history is not None else ([run] if run else []))
         self.current_error = current_error
         self.history_error = history_error
+        self.all_error = all_error
         self.latest_calls = 0
+        self.all_calls = 0
         self.summary_calls = []
         self.history_calls = []
 
@@ -96,6 +110,12 @@ class FakeMySQLRepository:
             raise self.history_error
         return deepcopy(self.history)
 
+    def get_all_run_summaries(self):
+        self.all_calls += 1
+        if self.all_error:
+            raise self.all_error
+        return deepcopy(self.history)
+
 
 class FakeMongoRepository:
     def __init__(self, facts=None, trend=None, *, summary_error=None, trend_error=None):
@@ -104,6 +124,7 @@ class FakeMongoRepository:
         self.summary_error = summary_error
         self.trend_error = trend_error
         self.summary_calls = []
+        self.multi_summary_calls = []
         self.trend_calls = []
 
     def get_rejection_summary(self, run_id):
@@ -117,3 +138,9 @@ class FakeMongoRepository:
         if self.trend_error:
             raise self.trend_error
         return deepcopy(self.trend)
+
+    def get_rejection_summary_for_runs(self, run_ids):
+        self.multi_summary_calls.append(list(run_ids))
+        if self.summary_error:
+            raise self.summary_error
+        return deepcopy(self.facts)

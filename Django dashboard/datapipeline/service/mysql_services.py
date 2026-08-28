@@ -4,6 +4,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from datapipeline.repository.mysql_repository import (
+    COUNT_COLUMNS,
     PipelineRepository,
     PipelineRepositoryError,
     parse_run_id_started_at,
@@ -116,6 +117,25 @@ def empty_run_summary():
         "created_at": None,
         "updated_at": None,
     }
+
+
+def aggregate_run_summaries(runs):
+    """Sum batch facts while retaining the latest batch metadata."""
+    if not runs:
+        return empty_run_summary()
+
+    latest = runs[0]
+    aggregate = dict(latest)
+    aggregate.update(
+        {
+            column: sum(int(run.get(column) or 0) for run in runs)
+            for column in COUNT_COLUMNS
+        }
+    )
+    aggregate["run_id"] = "ALL-RUNS"
+    aggregate["source_run_count"] = len(runs)
+    aggregate["latest_run_id"] = latest["run_id"]
+    return aggregate
 
 
 def evaluate_mysql_alerts(run, history=None, now=None, policy=None):
@@ -298,32 +318,49 @@ class MySQLDashboardService:
 
     def get_dashboard(self, run_id=None):
         repository_alerts = []
+        aggregate_scope = run_id is None
         try:
-            run = self.mysql_repository.get_run_summary(run_id) if run_id else self.mysql_repository.get_latest_run_summary()
-            if run is None:
+            if run_id:
+                selected_run = self.mysql_repository.get_run_summary(run_id)
+                all_runs = [selected_run] if selected_run else []
+                run = selected_run or empty_run_summary()
+            else:
+                all_runs = self.mysql_repository.get_all_run_summaries()
+                run = aggregate_run_summaries(all_runs)
+            if not all_runs:
                 run = empty_run_summary()
                 repository_alerts.append(make_alert("WARNING", "NO_BATCH_DATA", "조회 가능한 배치가 없습니다.", source="MYSQL"))
         except PipelineRepositoryError:
+            all_runs = []
             run = empty_run_summary()
             history = []
-            repository_alerts.append(make_alert("CRITICAL", "MYSQL_UNAVAILABLE", "MySQL 배치 데이터를 조회할 수 없습니다.", source="MYSQL"))
+            repository_alerts.append(make_alert("CRITICAL", "MYSQL_UNAVAILABLE", "MySQL 배치 데이터를 조회할 수 없습니다.", source="MYSQL", run_id=run_id))
         else:
-            try:
-                history = self.mysql_repository.get_run_history(limit=12)
-            except PipelineRepositoryError:
-                history = []
-                repository_alerts.append(
-                    make_alert(
-                        "WARNING",
-                        "MYSQL_HISTORY_UNAVAILABLE",
-                        "현재 배치는 조회했지만 MySQL 배치 이력을 조회할 수 없습니다.",
-                        source="MYSQL",
-                        run_id=run["run_id"],
+            if aggregate_scope:
+                history = all_runs[:12]
+            else:
+                try:
+                    history = self.mysql_repository.get_run_history(limit=12)
+                except PipelineRepositoryError:
+                    history = []
+                    repository_alerts.append(
+                        make_alert(
+                            "WARNING",
+                            "MYSQL_HISTORY_UNAVAILABLE",
+                            "현재 배치는 조회했지만 MySQL 배치 이력을 조회할 수 없습니다.",
+                            source="MYSQL",
+                            run_id=run["run_id"],
+                        )
                     )
-                )
 
         mysql = build_mysql_dashboard_data(run, history)
-        alerts = repository_alerts + evaluate_mysql_alerts(run, history, policy=self.alert_policy)
+        alert_run = all_runs[0] if aggregate_scope and all_runs else run
+        mysql_alerts = (
+            evaluate_mysql_alerts(alert_run, history, policy=self.alert_policy)
+            if all_runs
+            else []
+        )
+        alerts = repository_alerts + mysql_alerts
         status = alert_status(alerts)
         history_for_chart = list(reversed(history))
         stage_rejected = run["standardization_rejected_count"] + run["final_rejected_count"]
@@ -333,6 +370,13 @@ class MySQLDashboardService:
         context.update(
             {
                 "mysql": mysql,
+                "aggregation_scope": "ALL_RUNS" if aggregate_scope else "SINGLE_RUN",
+                "aggregated_run_count": len(all_runs),
+                "aggregation_label": (
+                    f"ALL {len(all_runs):,} RUNS"
+                    if aggregate_scope
+                    else f"RUN {run['run_id']}"
+                ),
                 "alerts": alerts,
                 "overall_status": status,
                 "overall_status_label": "정상" if status == "NORMAL" else "경고" if status == "WARNING" else "위험",

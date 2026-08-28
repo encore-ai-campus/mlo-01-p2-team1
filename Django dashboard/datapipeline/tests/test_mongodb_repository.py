@@ -141,10 +141,57 @@ class MongoRepositoryTests(SimpleTestCase):
         self.assertEqual(result["run-b"]["normalization"]["error_occurrences"], 1)
         self.assertEqual(repository.get_run_counts([]), {})
 
+    def test_multi_run_summary_uses_mysql_run_ids_and_keeps_rows_distinct_per_run(self):
+        run_ids = ["run-a", "run-b"]
+        standard = FakeCollection(
+            documents=[
+                {
+                    "run_id": "run-a",
+                    "_source_row_number": 1,
+                    "errors": [
+                        {
+                            "error_code": "REJECTED_STANDARDIZATION : MISSING_REQUIRED"
+                        }
+                    ],
+                },
+                {
+                    "run_id": "run-b",
+                    "_source_row_number": 1,
+                    "errors": [
+                        {
+                            "error_code": "REJECTED_STANDARDIZATION : DOMAIN_VIOLATION"
+                        }
+                    ],
+                },
+            ]
+        )
+        repository = self._repository(standard, FakeCollection())
+
+        summary = repository.get_rejection_summary_for_runs(
+            ["run-a", "run-b", "run-a"]
+        )
+
+        self.assertEqual(summary["run_ids"], run_ids)
+        self.assertEqual(summary["run_count"], 2)
+        self.assertEqual(summary["total_rejected_rows"], 2)
+        self.assertEqual(summary["duplicate_document_count"], 0)
+        self.assertEqual(
+            summary["stages"]["standardization"]["run_counts"]["run-a"][
+                "rejected_rows"
+            ],
+            1,
+        )
+        self.assertEqual(
+            standard.find_calls[0][0],
+            {"run_id": {"$in": run_ids}},
+        )
+
     def test_missing_run_id_and_database_failures_are_repository_errors(self):
         repository = self._repository(FakeCollection(), FakeCollection())
         with self.assertRaises(MongoRepositoryError):
             repository.get_rejection_summary("")
+        with self.assertRaises(MongoRepositoryError):
+            repository.get_rejection_summary_for_runs([])
 
         failing = self._repository(
             FakeCollection(failure=RuntimeError("mongo offline")),

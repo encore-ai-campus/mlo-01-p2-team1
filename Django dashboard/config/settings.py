@@ -51,6 +51,11 @@ DASHBOARD_DATA_MODE = os.getenv("DASHBOARD_DATA_MODE", "sample").strip().lower()
 if DASHBOARD_DATA_MODE not in {"sample", "live"}:
     DASHBOARD_DATA_MODE = "sample"
 
+GOLD_DASHBOARD_VIEW = os.getenv(
+    "GOLD_DASHBOARD_VIEW",
+    "dashboard_gold_manager_view",
+).strip()
+
 
 # Application definition
 

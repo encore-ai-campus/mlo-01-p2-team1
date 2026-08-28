@@ -174,9 +174,9 @@ class MySQLDashboardServiceTests(SimpleTestCase):
         self.assertEqual(context["mysql"]["run"]["run_id"], run["run_id"])
         self.assertEqual(context["chart_payload"]["mysqlLoadTrend"]["type"], "line")
 
-    def test_current_repository_failure_becomes_critical_alert(self):
+    def test_all_run_repository_failure_becomes_critical_alert(self):
         repository = FakeMySQLRepository(
-            current_error=PipelineRepositoryError("offline")
+            all_error=PipelineRepositoryError("offline")
         )
 
         context = MySQLDashboardService(mysql_repository=repository).get_dashboard()
@@ -191,9 +191,25 @@ class MySQLDashboardServiceTests(SimpleTestCase):
             history_error=PipelineRepositoryError("history unavailable"),
         )
 
-        context = MySQLDashboardService(mysql_repository=repository).get_dashboard()
+        context = MySQLDashboardService(mysql_repository=repository).get_dashboard(
+            run["run_id"]
+        )
 
         self.assertEqual(context["mysql"]["run"]["run_id"], run["run_id"])
         self.assertEqual(context["mysql"]["standardized"]["accepted"], 14)
         self.assertIn("MYSQL_HISTORY_UNAVAILABLE", alert_codes(context["alerts"]))
         self.assertEqual(context["overall_status"], "WARNING")
+
+    def test_default_dashboard_aggregates_all_mysql_view_runs(self):
+        latest = make_run(run_id="run-latest")
+        previous = make_run(run_id="run-previous")
+        repository = FakeMySQLRepository(latest, [latest, previous])
+
+        context = MySQLDashboardService(mysql_repository=repository).get_dashboard()
+
+        self.assertEqual(repository.all_calls, 1)
+        self.assertEqual(context["aggregation_scope"], "ALL_RUNS")
+        self.assertEqual(context["aggregated_run_count"], 2)
+        self.assertEqual(context["mysql"]["run"]["run_id"], "ALL-RUNS")
+        self.assertEqual(context["mysql"]["standardized"]["input"], 32)
+        self.assertEqual(context["mysql"]["standardized"]["accepted"], 28)
