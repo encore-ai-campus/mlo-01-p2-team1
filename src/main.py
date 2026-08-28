@@ -342,6 +342,10 @@ def print_pipeline_summary(completed: Mapping[str, Any]) -> None:
         for entity in entity_names
     }
     total_loaded_count = sum(loaded_counts.values())
+    gold_loaded_count = mysql_load.get(
+        "gold_manager_assignment_loaded_count",
+        0,
+    )
 
     print("\n===== 파이프라인 처리 결과 =====")
     print(f"실행 회차(run_id): {final_result['run_id']}")
@@ -365,10 +369,14 @@ def print_pipeline_summary(completed: Mapping[str, Any]) -> None:
     for entity in entity_names:
         print(f"{entity}: {loaded_counts[entity]}")
     print(f"RDB 적재 처리 합계: {total_loaded_count}")
+    print()
+    print("[Gold Feature]")
+    print(f"담당자별 업무영역 배치 Feature: {gold_loaded_count}")
 
 
 if __name__ == "__main__":
-    completed_runs = run_until_no_pending()
+    # 스케줄러가 한 번 실행될 때 하나의 pending run_id만 처리한다.
+    completed_runs = run_until_no_pending(max_runs=1)
     if not completed_runs:
         print("처리할 pending run_id가 없습니다.")
     else:

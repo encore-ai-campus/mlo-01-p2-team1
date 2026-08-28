@@ -7,6 +7,11 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from src.gold.manager_assignment_features import (
+    GOLD_MANAGER_ASSIGNMENT_COLUMNS,
+    build_manager_assignment_features,
+)
+
 try:
     from dotenv import load_dotenv
 except ImportError:
@@ -216,7 +221,7 @@ def upsert_pipeline_run_summary(connection, summary):
 
 
 def load_final_result(connection, final_result):
-    """manager → top_area → area를 하나의 트랜잭션으로 적재한다."""
+    """Silver 세 테이블과 담당자별 Gold Feature를 함께 적재한다."""
     run_id = final_result["run_id"]
     rows = final_result["final_accepted_row_list"]
     managers = add_run_id(
@@ -231,6 +236,11 @@ def load_final_result(connection, final_result):
         run_id,
         build_entity_rows(rows, "business_area_id", AREA_COLUMNS),
     )
+    gold_features = build_manager_assignment_features(final_result)
+    gold_rows = [
+        tuple(feature[column] for column in GOLD_MANAGER_ASSIGNMENT_COLUMNS)
+        for feature in gold_features
+    ]
 
     manager_sql = """
         INSERT INTO manager (
@@ -272,6 +282,35 @@ def load_final_result(connection, final_result):
             business_area_registration_datetime =
                 VALUES(business_area_registration_datetime)
     """
+    gold_sql = """
+        INSERT INTO gold_manager_assignment_features (
+            run_id, as_of_datetime, manager_id,
+            manager_department_name, manager_position_name,
+            manager_active_flag, manager_tenure_days,
+            managed_area_count, managed_top_area_count,
+            managed_parent_area_count, top_level_area_count,
+            average_area_age_days, max_area_age_days,
+            cross_top_area_flag, feature_version
+        ) VALUES (
+            %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s
+        )
+        ON DUPLICATE KEY UPDATE
+            as_of_datetime = VALUES(as_of_datetime),
+            manager_department_name = VALUES(manager_department_name),
+            manager_position_name = VALUES(manager_position_name),
+            manager_active_flag = VALUES(manager_active_flag),
+            manager_tenure_days = VALUES(manager_tenure_days),
+            managed_area_count = VALUES(managed_area_count),
+            managed_top_area_count = VALUES(managed_top_area_count),
+            managed_parent_area_count = VALUES(managed_parent_area_count),
+            top_level_area_count = VALUES(top_level_area_count),
+            average_area_age_days = VALUES(average_area_age_days),
+            max_area_age_days = VALUES(max_area_age_days),
+            cross_top_area_flag = VALUES(cross_top_area_flag),
+            feature_version = VALUES(feature_version)
+    """
 
     cursor = connection.cursor()
     try:
@@ -279,6 +318,12 @@ def load_final_result(connection, final_result):
         cursor.executemany(manager_sql, managers)
         cursor.executemany(top_area_sql, top_areas)
         cursor.executemany(area_sql, areas)
+        cursor.execute(
+            "DELETE FROM gold_manager_assignment_features WHERE run_id = %s",
+            (run_id,),
+        )
+        if gold_rows:
+            cursor.executemany(gold_sql, gold_rows)
         connection.commit()
     except Exception:
         connection.rollback()
@@ -297,4 +342,7 @@ def load_final_result(connection, final_result):
         "top_area_loaded_count": len(top_areas),
         "area_target_count": len(areas),
         "area_loaded_count": len(areas),
+        "gold_manager_assignment_row_count": len(gold_rows),
+        "gold_manager_assignment_target_count": len(gold_rows),
+        "gold_manager_assignment_loaded_count": len(gold_rows),
     }
