@@ -48,3 +48,18 @@ DB 환경 변수가 없는 동안에는 SQLite 설정과 repository의 샘플 �
 | 조회 장애 | 현재 KPI는 유지되지만 MySQL 이력 또는 MongoDB 추이 조회 실패 | 최신 MySQL 배치 또는 현재 MongoDB rejected 데이터 조회 실패 |
 
 한 MongoDB 문서에 `errors`가 여러 개일 수 있으므로 **반려 행 수**와 **오류 발생 건수**는 별도로 집계합니다. 오류 사유 차트는 오류 발생 건수 기준의 막대 차트이며 합계 비율이 반려 행 기준 100%를 초과하는 상황을 비율 차트로 표현하지 않습니다.
+
+## Bronze cursor 기반 페이지 append crawler (Issue #41)
+
+Bronze crawler는 `/api/v1/records?limit=1000` 응답의 signed `next_cursor`만 연쇄하여 페이지별 `run_id`로 MongoDB `legacy_records`에 append한다. 최초 full pagination 이후에는 원자적으로 저장한 continuation cursor에서 시작해 3분 주기의 신규 데이터만 추가한다. `page`, `offset`, `release_slot`, `record_id`, `source_row_no`는 API 페이지 이동 기준으로 사용하지 않는다.
+
+운영은 `systemd`의 `legacy-crawler.service`가 담당하며, 매 cycle의 append·페이지 검증·manifest 기록 후 metadata의 `next_refresh_at + 5초`까지 대기한다. cursor 만료·거부 또는 checkpoint 계약 불일치 시 첫 페이지로 자동 fallback하지 않고 실패 종료한다.
+
+전환 검증 시점의 증빙은 최초 full 27,532건/28 page runs, 이후 continuation 증분 성공, `record_id` 중복 0, `source_row_no` 중복 0, `run_id` 누락 0, Unit 30 PASS, Contract 3 PASS, Integration 2 PASS, systemd active이다. 이 숫자는 전환 검증 이력이며 운영 문서 수와 `run_id` 수는 계속 증가하므로 현재 고정값으로 사용하지 않는다.
+
+- [Bronze crawler 개요와 실행](BRONZE_CRAWLER.md)
+- [Bronze 아키텍처](docs/bronze_architecture.md)
+- [Bronze 운영 매뉴얼](docs/bronze_operation_manual.md)
+- [MongoDB 데이터 계약](docs/mongodb_data_contract.md)
+- [팀 조회 가이드](docs/team_query_guide.md)
+- [장애 대응과 rollback](docs/troubleshooting_and_rollback.md)

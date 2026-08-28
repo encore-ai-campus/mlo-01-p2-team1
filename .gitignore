@@ -126,3 +126,8 @@ api_test/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Bronze crawler runtime artifacts
+/data/bronze/
+/backup/bronze/
+/state/
