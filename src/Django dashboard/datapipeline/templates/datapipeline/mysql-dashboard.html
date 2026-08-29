@@ -1,0 +1,100 @@
+{% load static humanize %}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="표준화와 정규화를 통과한 MySQL accepted 데이터 적재 관제 화면">
+    <title>MySQL Accepted Monitor | Data Command</title>
+    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=3d5">
+    <script src="{% static 'datapipeline/vendor/echarts.min.js' %}?v=6.1.0" defer></script>
+    <script src="{% static 'datapipeline/js/dashboard.js' %}?v=3d3" defer></script>
+</head>
+<body data-page="mysql">
+    <div class="ambient-grid" aria-hidden="true"></div>
+    <header class="command-bar">
+        <a class="command-brand" href="{% url 'datapipeline:main' %}" aria-label="통합 관제 홈"><span class="brand-core"><i></i></span><span><strong>DATA COMMAND</strong><small>PIPELINE INTELLIGENCE SYSTEM</small></span></a>
+        <nav class="command-nav" aria-label="대시보드 이동">
+            <a href="{% url 'datapipeline:main' %}"><span>01</span> 통합 관제</a>
+            <a class="active" href="{% url 'datapipeline:mysql' %}"><span>02</span> MySQL</a>
+            <a href="{% url 'datapipeline:mongodb' %}"><span>03</span> MongoDB</a>
+            <a href="{% url 'datapipeline:gold' %}"><span>04</span> Gold</a>
+        </nav>
+        <div class="system-cluster"><span class="demo-tag">{{ data_mode }}</span><span class="system-online status-{{ overall_status|lower }}"><i></i> {{ overall_status }} · {{ alerts|length }} SIGNALS</span><time class="clock">--:--:--</time></div>
+    </header>
+
+    <main class="detail-command-layout">
+        {% if alerts %}<section class="warning-signal-tray status-{{ overall_status|lower }}" aria-label="MySQL 경고"><strong>{{ overall_status }}</strong>{% for alert in alerts|slice:":3" %}<span><b>{{ alert.source }}</b> {{ alert.message }}</span>{% endfor %}</section>{% endif %}
+        <header class="detail-command-heading">
+            <div>
+                <p>DATABASE CHANNEL / ACCEPTED DATA</p>
+                <h1><span class="database-title-icon mysql-title-icon">MY</span> MYSQL <b>ACCEPTED MONITOR</b></h1>
+                <small>{% if aggregation_scope == 'ALL_RUNS' %}MySQL View 전체 {{ aggregated_run_count|intcomma }}개 run의 accepted 및 테이블 적재 상태를 집계합니다.{% else %}선택한 run_id의 accepted 및 테이블 적재 상태를 추적합니다.{% endif %}</small>
+            </div>
+            <div class="detail-actions"><a href="{% url 'datapipeline:main' %}">← 3D 통합 관제</a><a class="purple-action" href="{% url 'datapipeline:mongodb' %}">MongoDB rejected →</a><a class="gold-action" href="{% url 'datapipeline:gold' %}">Gold intelligence →</a></div>
+        </header>
+
+        <section class="cyber-kpi-grid" aria-label="MySQL 핵심 지표">
+            <article class="cyber-kpi cyan-kpi"><small>STANDARD ACCEPTED</small><strong>{{ mysql.standardized.accepted|intcomma }}</strong><span><b>{{ mysql.standardized.rate }}%</b> of {{ mysql.standardized.input|intcomma }}</span><i style="--value:{{ mysql.standardized.rate }}%"></i></article>
+            <article class="cyber-kpi teal-kpi"><small>NORMALIZED ACCEPTED</small><strong>{{ mysql.normalized.accepted|intcomma }}</strong><span><b>{{ mysql.normalized.rate }}%</b> of {{ mysql.normalized.input|intcomma }}</span><i style="--value:{{ mysql.normalized.rate }}%"></i></article>
+            <article class="cyber-kpi amber-kpi"><small>MYSQL LOAD RATE</small><strong>{{ mysql.load.rate }}%</strong><span><b>{{ mysql.load.loaded|intcomma }}</b> / {{ mysql.load.expected|intcomma }}</span><i style="--value:{{ mysql.load.rate }}%"></i></article>
+            <article class="cyber-kpi green-kpi"><small>DATA FRESHNESS</small><strong>{{ mysql.freshness }}</strong><span><b>LIVE</b> latest write</span><div class="signal-wave"><i></i><i></i><i></i><i></i><i></i></div></article>
+        </section>
+
+        <section class="analytics-grid">
+            <article class="hud-panel span-8 chart-panel tall-chart-panel">
+                <div class="panel-title"><span>LOAD RATE TELEMETRY</span><b>KST · 30 MIN BUCKETS</b></div>
+                <div class="echart chart-large" data-dashboard-chart="mysqlLoadTrend" role="img" aria-label="시간대별 MySQL 적재율"></div>
+            </article>
+            <article class="hud-panel span-4 chart-panel tall-chart-panel">
+                <div class="panel-title"><span>ACCEPTANCE ORBIT</span><b>DISTRIBUTION</b></div>
+                <div class="echart chart-large" data-dashboard-chart="mysqlAcceptance" role="img" aria-label="MySQL 승인 데이터 구성"></div>
+            </article>
+
+            <article class="hud-panel span-12 stage-channel-panel">
+                <div class="panel-title"><span>ACCEPTED DATA CHANNEL</span><b>{{ aggregation_label }}</b></div>
+                <div class="cyber-stage-flow accepted-stage-flow">
+                    <div><span>01</span><small>LEGACY INPUT</small><strong>{{ mysql.standardized.input|intcomma }}</strong><em>100%</em></div><i></i>
+                    <div><span>02</span><small>STANDARD ACCEPTED</small><strong>{{ mysql.standardized.accepted|intcomma }}</strong><em>{{ mysql.standardized.rate }}%</em></div><i></i>
+                    <div><span>03</span><small>NORMALIZED ACCEPTED</small><strong>{{ mysql.normalized.accepted|intcomma }}</strong><em>{{ mysql.normalized.rate }}%</em></div><i></i>
+                    <div class="terminal-stage"><span>04</span><small>MYSQL LOADED</small><strong>{{ mysql.load.loaded|intcomma }}</strong><em>{{ mysql.load.rate }}%</em></div>
+                </div>
+            </article>
+
+            <article class="hud-panel span-7 chart-panel">
+                <div class="panel-title"><span>TABLE LOAD MATRIX</span><b>PERCENTAGE</b></div>
+                <div class="echart chart-medium-detail" data-dashboard-chart="mysqlTableLoad" role="img" aria-label="MySQL 테이블별 적재율"></div>
+            </article>
+            <article class="hud-panel span-5 chart-panel">
+                <div class="panel-title"><span>STAGE VOLUME</span><b>RECORDS</b></div>
+                <div class="echart chart-medium-detail" data-dashboard-chart="mysqlStageVolume" role="img" aria-label="MySQL 단계별 처리 건수"></div>
+            </article>
+
+            <article class="hud-panel span-8 data-grid-panel">
+                <div class="panel-title"><span>TABLE INTEGRITY STATUS</span><b>{{ mysql.tables|length }} TABLES</b></div>
+                <div class="cyber-table-wrap">
+                    <table class="cyber-table">
+                        <thead><tr><th>TABLE ID</th><th>STAGE</th><th>LOADED / EXPECTED</th><th>RATE</th><th>STATUS</th></tr></thead>
+                        <tbody>{% for table in mysql.tables %}<tr><td><strong>{{ table.name }}</strong></td><td>{{ table.stage }}</td><td>{{ table.loaded|intcomma }} <small>/ {{ table.expected|intcomma }}</small></td><td><div class="table-rate"><i style="--value:{{ table.rate }}%"></i><b>{{ table.rate }}%</b></div></td><td><span class="state-chip {% if table.status == '정상' %}state-good{% else %}state-warn{% endif %}">{{ table.status }}</span></td></tr>{% endfor %}</tbody>
+                    </table>
+                </div>
+            </article>
+
+            <article class="hud-panel span-4 link-status-panel">
+                <div class="panel-title"><span>DATABASE LINK</span><b>{{ data_mode }}</b></div>
+                <div class="link-core mysql-link-core"><span>MY</span><i></i><i></i></div>
+                <dl><div><dt>REPOSITORY</dt><dd>PipelineRepository</dd></div><div><dt>DATA CLASS</dt><dd>accepted</dd></div><div><dt>ENV CHANNEL</dt><dd>MYSQL_*</dd></div></dl>
+                <p>실제 DB 스키마가 연결되면 repository 조회 결과가 동일한 시각화 계약으로 반영됩니다.</p>
+            </article>
+
+            <article class="hud-panel span-12 data-grid-panel">
+                <div class="panel-title"><span>RECENT LOAD BATCHES</span><button type="button" data-refresh-button>↻ REFRESH</button></div>
+                <div class="cyber-table-wrap"><table class="cyber-table compact-cyber-table"><thead><tr><th>BATCH ID</th><th>STAGE</th><th>ROWS</th><th>DURATION</th><th>RESULT</th></tr></thead><tbody>{% for batch in mysql.recent_batches %}<tr><td><strong>{{ batch.id }}</strong></td><td>{{ batch.stage }}</td><td>{{ batch.rows|intcomma }}</td><td>{{ batch.duration }}</td><td><span class="state-chip {% if batch.status == 'SUCCESS' %}state-good{% else %}state-warn{% endif %}">{{ batch.status }}</span></td></tr>{% endfor %}</tbody></table></div>
+            </article>
+        </section>
+    </main>
+
+    <footer class="command-footer"><span>MYSQL CHANNEL</span><span>LATENCY 42ms</span><span>ENCODING UTF8MB4</span><b>UPDATED {{ updated_at }}</b></footer>
+    {{ chart_payload|json_script:"dashboard-chart-data" }}
+</body>
+</html>

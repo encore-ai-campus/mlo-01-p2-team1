@@ -1,0 +1,101 @@
+{% load static humanize %}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="표준화와 정규화 단계에서 반려된 MongoDB rejected 데이터 및 사유 관제 화면">
+    <title>MongoDB Rejected Monitor | Data Command</title>
+    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=3d5">
+    <script src="{% static 'datapipeline/vendor/echarts.min.js' %}?v=6.1.0" defer></script>
+    <script src="{% static 'datapipeline/js/dashboard.js' %}?v=3d3" defer></script>
+</head>
+<body data-page="mongodb">
+    <div class="ambient-grid" aria-hidden="true"></div>
+    <header class="command-bar">
+        <a class="command-brand" href="{% url 'datapipeline:main' %}" aria-label="통합 관제 홈"><span class="brand-core"><i></i></span><span><strong>DATA COMMAND</strong><small>PIPELINE INTELLIGENCE SYSTEM</small></span></a>
+        <nav class="command-nav" aria-label="대시보드 이동">
+            <a href="{% url 'datapipeline:main' %}"><span>01</span> 통합 관제</a>
+            <a href="{% url 'datapipeline:mysql' %}"><span>02</span> MySQL</a>
+            <a class="active purple-active" href="{% url 'datapipeline:mongodb' %}"><span>03</span> MongoDB</a>
+            <a href="{% url 'datapipeline:gold' %}"><span>04</span> Gold</a>
+        </nav>
+        <div class="system-cluster"><span class="demo-tag">{{ data_mode }}</span><span class="system-online status-{{ overall_status|lower }}"><i></i> {{ overall_status }} · {{ alerts|length }} SIGNALS</span><time class="clock">--:--:--</time></div>
+    </header>
+
+    <main class="detail-command-layout">
+        {% if alerts %}<section class="warning-signal-tray status-{{ overall_status|lower }}" aria-label="MongoDB 경고"><strong>{{ overall_status }}</strong>{% for alert in alerts|slice:":3" %}<span><b>{{ alert.source }}</b> {{ alert.message }}</span>{% endfor %}</section>{% endif %}
+        <header class="detail-command-heading mongo-command-heading">
+            <div>
+                <p>DATABASE CHANNEL / REJECTED + REASON</p>
+                <h1><span class="database-title-icon mongo-title-icon">MO</span> MONGODB <b>REJECTION MONITOR</b></h1>
+                <small>{% if aggregation_scope == 'ALL_RUNS' %}MySQL View 전체 {{ aggregated_run_count|intcomma }}개 run과 일치하는 rejected 데이터 및 반려 사유를 집계합니다.{% else %}선택한 run_id의 rejected 데이터 및 반려 사유를 추적합니다.{% endif %}</small>
+            </div>
+            <div class="detail-actions"><a href="{% url 'datapipeline:main' %}">← 3D 통합 관제</a><a class="cyan-action" href="{% url 'datapipeline:mysql' %}">MySQL accepted →</a><a class="gold-action" href="{% url 'datapipeline:gold' %}">Gold intelligence →</a></div>
+        </header>
+
+        <section class="cyber-kpi-grid" aria-label="MongoDB 핵심 지표">
+            <article class="cyber-kpi purple-kpi"><small>STANDARD REJECTED</small><strong>{{ mongo.standardized.rejected|intcomma }}</strong><span><b>{{ mongo.standardized.rate }}%</b> of {{ mongo.standardized.input|intcomma }}</span><i style="--value:{{ mongo.standardized.rate }}%"></i></article>
+            <article class="cyber-kpi amber-kpi"><small>NORMALIZED REJECTED</small><strong>{{ mongo.normalized.rejected|intcomma }}</strong><span><b>{{ mongo.normalized.rate }}%</b> of {{ mongo.normalized.input|intcomma }}</span><i style="--value:{{ mongo.normalized.rate }}%"></i></article>
+            <article class="cyber-kpi purple-kpi"><small>MONGODB LOAD RATE</small><strong>{{ mongo.load.rate }}%</strong><span><b>{{ mongo.load.loaded|intcomma }}</b> / {{ mongo.load.expected|intcomma }}</span><i style="--value:{{ mongo.load.rate }}%"></i></article>
+            <article class="cyber-kpi red-kpi"><small>TOP ERROR SIGNAL</small><strong class="text-kpi">{{ mongo.top_reason.label }}</strong><span><b>{{ mongo.top_reason.count|intcomma }}</b> {{ mongo.top_reason.code }}</span><i style="--value:{{ mongo.top_reason.rate }}%"></i></article>
+        </section>
+
+        <section class="analytics-grid">
+            <article class="hud-panel span-8 chart-panel tall-chart-panel">
+                <div class="panel-title"><span>REJECTION SIGNAL ANALYSIS</span><b>TOP 5 REASONS</b></div>
+                <div class="echart chart-large" data-dashboard-chart="mongoReasonVolume" role="img" aria-label="MongoDB 반려 사유별 발생 건수"></div>
+            </article>
+            <article class="hud-panel span-4 chart-panel tall-chart-panel">
+                <div class="panel-title"><span>REJECTED ORBIT</span><b>STAGE SPLIT</b></div>
+                <div class="echart chart-large" data-dashboard-chart="mongoStageSplit" role="img" aria-label="표준화와 정규화 반려 비중"></div>
+            </article>
+
+            <article class="hud-panel span-12 stage-channel-panel rejected-channel-panel">
+                <div class="panel-title"><span>REJECTED DATA ROUTING</span><b>{{ aggregation_label }}</b></div>
+                <div class="rejection-routing-flow">
+                    <div class="routing-input"><small>PIPELINE INPUT</small><strong>{{ mongo.standardized.input|intcomma }}</strong><span>validation target</span></div><i></i>
+                    <div class="routing-split"><article><small>STANDARD REJECTED</small><strong>{{ mongo.standardized.rejected|intcomma }}</strong><em>{{ mongo.standardized.rate }}%</em></article><article><small>NORMALIZED REJECTED</small><strong>{{ mongo.normalized.rejected|intcomma }}</strong><em>{{ mongo.normalized.rate }}%</em></article></div><i></i>
+                    <div class="routing-terminal"><span>MO</span><div><small>MONGODB STORED</small><strong>{{ mongo.load.loaded|intcomma }}</strong><em>{{ mongo.load.rate }}%</em></div></div>
+                </div>
+            </article>
+
+            <article class="hud-panel span-7 chart-panel">
+                <div class="panel-title"><span>REJECTED VELOCITY</span><b>LAST 3 HOURS</b></div>
+                <div class="echart chart-medium-detail" data-dashboard-chart="mongoRejectTrend" role="img" aria-label="시간대별 반려 데이터 발생량"></div>
+            </article>
+            <article class="hud-panel span-5 chart-panel">
+                <div class="panel-title"><span>COLLECTION LOAD MATRIX</span><b>PERCENTAGE</b></div>
+                <div class="echart chart-medium-detail" data-dashboard-chart="mongoCollectionLoad" role="img" aria-label="MongoDB 컬렉션별 적재율"></div>
+            </article>
+
+            <article class="hud-panel span-7 reason-matrix-panel">
+                <div class="panel-title"><span>REASON CODE MATRIX</span><b>{{ mongo.reasons|length }} ACTIVE RULES</b></div>
+                <div class="reason-signal-list">
+                    {% for reason in mongo.reasons %}
+                    <div><span>0{{ forloop.counter }}</span><p><strong>{{ reason.label }}</strong><small>{{ reason.code }}</small></p><i><b style="--value:{{ reason.rate }}%"></b></i><em>{{ reason.count|intcomma }}</em><mark>{{ reason.rate }}%</mark></div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="hud-panel span-5 link-status-panel">
+                <div class="panel-title"><span>COLLECTION CHANNELS</span><b>{{ data_mode }}</b></div>
+                <div class="collection-channel-list">
+                    {% for collection in mongo.collections %}
+                    <article><div><i></i><strong>{{ collection.name }}</strong><small>{{ collection.stage }} rejected</small></div><b>{{ collection.rate }}%</b><span><i style="--value:{{ collection.rate }}%"></i></span><p>{{ collection.loaded|intcomma }} / {{ collection.expected|intcomma }} documents</p></article>
+                    {% endfor %}
+                </div>
+                <div class="mongo-link-summary"><div class="link-core mongo-link-core"><span>MO</span><i></i><i></i></div><p><strong>MongoRepository</strong>두 rejected 컬렉션을 MySQL View의 run_id 집합 기준으로 집계합니다.</p></div>
+            </article>
+
+            <article class="hud-panel span-12 data-grid-panel">
+                <div class="panel-title"><span>RECENT REJECTION STREAM</span><button type="button" data-refresh-button>↻ REFRESH</button></div>
+                <div class="cyber-table-wrap"><table class="cyber-table compact-cyber-table"><thead><tr><th>BATCH TIME</th><th>RECORD ID</th><th>STAGE</th><th>ERROR CODE</th><th>STORAGE</th></tr></thead><tbody>{% for item in mongo.recent_rejections %}<tr><td>{{ item.time }}</td><td><strong>{{ item.record }}</strong></td><td>{{ item.stage }}</td><td><code>{{ item.reason }}</code></td><td><span class="state-chip state-purple">STORED</span></td></tr>{% endfor %}</tbody></table></div>
+            </article>
+        </section>
+    </main>
+
+    <footer class="command-footer"><span>MONGODB CHANNEL</span><span>LATENCY 38ms</span><span>DOCUMENT MODE</span><b>UPDATED {{ updated_at }}</b></footer>
+    {{ chart_payload|json_script:"dashboard-chart-data" }}
+</body>
+</html>

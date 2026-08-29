@@ -1,0 +1,146 @@
+{% load static humanize %}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Legacy 수집부터 MySQL과 MongoDB 적재까지 3D로 관제하는 데이터 파이프라인 대시보드">
+    <title>Data Pipeline Command Center</title>
+    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=3d5">
+    <script src="{% static 'datapipeline/vendor/echarts.min.js' %}?v=6.1.0" defer></script>
+    <script src="{% static 'datapipeline/js/dashboard.js' %}?v=3d3" defer></script>
+    <script type="module" src="{% static 'datapipeline/js/pipeline-3d.js' %}?v=3d6"></script>
+</head>
+<body data-page="main">
+    <div class="ambient-grid" aria-hidden="true"></div>
+    <header class="command-bar">
+        <a class="command-brand" href="{% url 'datapipeline:main' %}" aria-label="통합 관제 홈">
+            <span class="brand-core"><i></i></span>
+            <span><strong>DATA COMMAND</strong><small>PIPELINE INTELLIGENCE SYSTEM</small></span>
+        </a>
+        <nav class="command-nav" aria-label="대시보드 이동">
+            <a class="active" href="{% url 'datapipeline:main' %}"><span>01</span> 통합 관제</a>
+            <a href="{% url 'datapipeline:mysql' %}"><span>02</span> MySQL</a>
+            <a href="{% url 'datapipeline:mongodb' %}"><span>03</span> MongoDB</a>
+            <a href="{% url 'datapipeline:gold' %}"><span>04</span> Gold</a>
+        </nav>
+        <div class="system-cluster">
+            <span class="demo-tag">{{ data_mode }}</span>
+            <span class="system-online status-{{ overall_status|lower }}"><i></i> {{ overall_status }} · {{ alerts|length }} SIGNALS</span>
+            <time class="clock">--:--:--</time>
+        </div>
+    </header>
+
+    {% if alerts %}<section class="warning-signal-tray status-{{ overall_status|lower }}" aria-label="파이프라인 경고"><strong>{{ overall_status }}</strong>{% for alert in alerts|slice:":3" %}<span><b>{{ alert.source }}</b> {{ alert.message }}</span>{% endfor %}</section>{% endif %}
+
+    <main class="command-layout">
+        <aside class="hud-column hud-left" aria-label="수집 및 처리 지표">
+            <section class="hud-panel metric-panel cyan-panel">
+                <div class="panel-title"><span>INGESTION MATRIX</span><b>LIVE</b></div>
+                <div class="metric-pair">
+                    <div><small>LEGACY INPUT</small><strong>{{ legacy.total_received|intcomma }}</strong><span>records</span></div>
+                    <div><small>INPUT RATE</small><strong>{{ legacy.input_rate }}%</strong><span>of legacy data</span></div>
+                </div>
+                <div class="scan-progress"><i style="--value:{{ legacy.input_rate }}%"></i></div>
+            </section>
+
+            <section class="hud-panel chart-panel">
+                <div class="panel-title"><span>HOURLY INGESTION</span><b>RAW RECORDS</b></div>
+                <div class="echart chart-small" data-dashboard-chart="hourlyIngestionVolume" role="img" aria-label="시간당 Legacy 원천 데이터 수집량"></div>
+            </section>
+
+            <section class="hud-panel chart-panel">
+                <div class="panel-title"><span>PROCESS THROUGHPUT</span><b>3 HOURS</b></div>
+                <div class="echart chart-medium" data-dashboard-chart="pipelineThroughput" role="img" aria-label="시간대별 파이프라인 처리량"></div>
+            </section>
+
+            <section class="hud-panel event-stream-panel">
+                <div class="panel-title"><span>LIVE EVENT STREAM</span><b>{{ pipeline_events|length }} EVENTS</b></div>
+                <ol class="telemetry-events">
+                    {% for event in pipeline_events %}
+                    <li><i class="event-{{ event.tone }}"></i><time>{{ event.time }}</time><span>{{ event.label }}</span></li>
+                    {% endfor %}
+                </ol>
+            </section>
+        </aside>
+
+        <section class="pipeline-theater" aria-labelledby="command-title">
+            <header class="theater-heading">
+                <div>
+                    <p>MISSION CONTROL / LIVE TOPOLOGY</p>
+                    <h1 id="command-title">DATA PIPELINE <span>COMMAND CENTER</span></h1>
+                </div>
+                <div class="theater-meta">
+                    <span><i></i> LIVE RENDER</span>
+                    <small>UPDATED {{ updated_at }}</small>
+                </div>
+            </header>
+
+            <div class="scene-shell">
+                <div class="scene-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+                <div class="scene-readout scene-readout-left"><small>CURRENT BATCH</small><strong>{{ legacy.latest_batch }}</strong></div>
+                <div class="scene-readout scene-readout-right"><small>GLOBAL LOAD RATE</small><strong>{{ overall_load_rate }}%</strong></div>
+                <canvas id="pipeline-scene" data-mysql-url="{% url 'datapipeline:mysql' %}" data-mongo-url="{% url 'datapipeline:mongodb' %}" data-gold-url="{% url 'datapipeline:gold' %}" aria-label="Legacy 수집부터 표준화, 정규화, Gold Feature, MySQL 및 MongoDB 적재까지의 3D 파이프라인"></canvas>
+                <div class="webgl-fallback" id="webgl-fallback" hidden>
+                    <strong>3D 렌더링을 사용할 수 없습니다.</strong><span>브라우저의 WebGL 2 지원 상태를 확인해 주세요.</span>
+                </div>
+                <div class="scene-instruction"><i></i> AUTO ORBIT ACTIVE <span>·</span> SELECT A DATABASE NODE</div>
+                <div class="flow-legend">
+                    <span><i class="legacy-signal"></i> LEGACY</span>
+                    <span><i class="accepted-signal"></i> ACCEPTED</span>
+                    <span><i class="rejected-signal"></i> REJECTED + REASON</span>
+                </div>
+            </div>
+
+            <div class="stage-status-ribbon" aria-label="파이프라인 단계별 상태">
+                <article><span>01</span><div><small>INGESTION</small><strong>{{ legacy.total_received|intcomma }}</strong></div><em>100%</em></article>
+                <i></i>
+                <article><span>02</span><div><small>STANDARDIZATION</small><strong>{{ mysql.standardized.accepted|intcomma }}</strong></div><em>{{ mysql.standardized.rate }}%</em></article>
+                <i></i>
+                <article><span>03</span><div><small>NORMALIZATION</small><strong>{{ mysql.normalized.accepted|intcomma }}</strong></div><em>{{ mysql.normalized.rate }}%</em></article>
+                <i></i>
+                <article><span>04</span><div><small>GOLD FEATURES</small><strong>{{ database_shares.gold.managers|intcomma }}</strong></div><em>{{ database_shares.gold.rate }}%</em></article>
+                <i></i>
+                <article><span>05</span><div><small>DATABASE LOAD</small><strong>{{ total_loaded|intcomma }}</strong></div><em>{{ overall_load_rate }}%</em></article>
+            </div>
+        </section>
+
+        <aside class="hud-column hud-right" aria-label="데이터베이스 및 품질 지표">
+            <a class="database-gateway mysql-gateway" href="{% url 'datapipeline:mysql' %}">
+                <div class="gateway-icon"><span>MY</span><i></i></div>
+                <div><small>ACCEPTED / LEGACY</small><h2>MySQL</h2><p>{{ database_shares.mysql.loaded|intcomma }} / {{ database_shares.mysql.total|intcomma }}</p></div>
+                <strong>{{ database_shares.mysql.rate }}%</strong><b>OPEN →</b>
+            </a>
+
+            <a class="database-gateway mongo-gateway" href="{% url 'datapipeline:mongodb' %}">
+                <div class="gateway-icon"><span>MO</span><i></i></div>
+                <div><small>REJECTED / LEGACY</small><h2>MongoDB</h2><p>{{ database_shares.mongodb.loaded|intcomma }} / {{ database_shares.mongodb.total|intcomma }}</p></div>
+                <strong>{{ database_shares.mongodb.rate }}%</strong><b>OPEN →</b>
+            </a>
+
+            <a class="database-gateway gold-gateway" href="{% url 'datapipeline:gold' %}">
+                <div class="gateway-icon"><span>AU</span><i></i></div>
+                <div><small>AI READY / MANAGERS</small><h2>Gold Medallion</h2><p>{{ database_shares.gold.managers|intcomma }} manager features</p></div>
+                <strong>{{ database_shares.gold.rate }}%</strong><b>EXPLORE →</b>
+            </a>
+
+            <section class="hud-panel chart-panel quality-orbit-panel">
+                <div class="panel-title"><span>LOAD DISTRIBUTION</span><b>BALANCE</b></div>
+                <div class="echart chart-donut" data-dashboard-chart="qualityDistribution" role="img" aria-label="MySQL, MongoDB 및 대기 데이터 구성"></div>
+            </section>
+
+            <section class="hud-panel chart-panel">
+                <div class="panel-title"><span>REJECTION SIGNALS</span><b>TOP 5</b></div>
+                <div class="echart chart-medium" data-dashboard-chart="rejectReasonVolume" role="img" aria-label="MongoDB 반려 사유별 발생 건수"></div>
+            </section>
+        </aside>
+    </main>
+
+    <footer class="command-footer">
+        <span>NODE 04 / PIPELINE-SEOUL</span><span>LATENCY 42ms</span><span>UPTIME 99.98%</span><span>SECURE CHANNEL</span><b>© DATA COMMAND</b>
+    </footer>
+
+    {{ chart_payload|json_script:"dashboard-chart-data" }}
+    {{ scene_payload|json_script:"pipeline-scene-data" }}
+</body>
+</html>
