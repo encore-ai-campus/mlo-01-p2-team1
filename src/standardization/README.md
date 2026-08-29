@@ -90,7 +90,6 @@ result = do_standardization(
 3. 즉, 데이터를 가져오는 조건식은 manifest 컬렉션의 `crawl_status==completed` and `processing_status==pending`인 경우다.
 4. mongodb에서 일반 컬렉션에서 격리 컬렉션으로 옮기는 작업은 하나의 transaction으로 묶어야 한다.
 5. audit module또한 `crawl_status==completed` and `processing_status==pending`인 데이터에 대해서만 처리한다.
-	- 단, 매개변수로 run_id만 받는데, run_id가 None인 경우에만 이런 조건을 따져서 처리하고, 아니면 해당 run_id에 대해서 처리한다.
 
 
 1. mongodb에는 총 4개의 collection이 존재한다.
