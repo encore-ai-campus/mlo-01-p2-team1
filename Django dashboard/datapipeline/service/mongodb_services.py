@@ -6,6 +6,7 @@ from datapipeline.repository.mysql_repository import PipelineRepository, Pipelin
 from datapipeline.service.mysql_services import (
     DEFAULT_ALERT_POLICY,
     TERMINAL_STATUSES,
+    aggregate_run_summaries,
     alert_status,
     empty_run_summary,
     evaluate_mysql_alerts,
@@ -28,6 +29,7 @@ def empty_mongo_facts(run_id=None):
         "rows_without_errors": 0,
         "malformed_error_count": 0,
         "duplicate_document_count": 0,
+        "run_counts": {},
         "error_codes": [],
         "error_columns": [],
         "reprocess_statuses": [],
@@ -35,6 +37,8 @@ def empty_mongo_facts(run_id=None):
     }
     return {
         "run_id": run_id,
+        "run_ids": [run_id] if run_id else [],
+        "run_count": 1 if run_id else 0,
         "run_started_at": None,
         "stages": {
             "standardization": empty_stage("standardization"),
@@ -52,7 +56,7 @@ def empty_mongo_facts(run_id=None):
     }
 
 
-def evaluate_mongodb_alerts(run, mongo_facts, policy=None):
+def evaluate_mongodb_alerts(run, mongo_facts, policy=None, *, check_counts=True):
     policy = {**DEFAULT_ALERT_POLICY, **(policy or {})}
     run_id = run.get("run_id")
     status = str(run.get("batch_status") or "UNKNOWN").upper()
@@ -64,7 +68,7 @@ def evaluate_mongodb_alerts(run, mongo_facts, policy=None):
         ("NORMALIZATION", normalization_actual, run["final_rejected_count"]),
     )
 
-    if status in TERMINAL_STATUSES:
+    if check_counts and status in TERMINAL_STATUSES:
         for stage, actual, expected in comparisons:
             if actual == expected:
                 continue
@@ -97,6 +101,71 @@ def evaluate_mongodb_alerts(run, mongo_facts, policy=None):
     return alerts
 
 
+def evaluate_mongodb_run_alignment(runs, mongo_facts):
+    """Detect run-level rejected-count mismatches without cancellation."""
+    mismatches = []
+    for run in runs:
+        status = str(run.get("batch_status") or "UNKNOWN").upper()
+        if status not in TERMINAL_STATUSES:
+            continue
+
+        run_id = str(run.get("run_id") or "")
+        comparisons = (
+            (
+                "STANDARDIZATION",
+                run["standardization_rejected_count"],
+                mongo_facts["stages"]["standardization"]
+                .get("run_counts", {})
+                .get(run_id, {})
+                .get("rejected_rows", 0),
+            ),
+            (
+                "NORMALIZATION",
+                run["final_rejected_count"],
+                mongo_facts["stages"]["normalization"]
+                .get("run_counts", {})
+                .get(run_id, {})
+                .get("rejected_rows", 0),
+            ),
+        )
+        for stage, expected, actual in comparisons:
+            if actual != expected:
+                mismatches.append(
+                    {
+                        "run_id": run_id,
+                        "stage": stage,
+                        "expected": expected,
+                        "actual": actual,
+                        "status": status,
+                    }
+                )
+
+    if not mismatches:
+        return []
+
+    affected_run_ids = list(
+        dict.fromkeys(item["run_id"] for item in mismatches)
+    )
+    level = (
+        "CRITICAL"
+        if any(item["status"] == "SUCCESS" for item in mismatches)
+        else "WARNING"
+    )
+    return [
+        make_alert(
+            level,
+            "MONGODB_RUN_ID_RECONCILIATION_MISMATCH",
+            f"{len(affected_run_ids)}개 run_id에서 MySQL rejected 건수와 MongoDB 저장 건수가 일치하지 않습니다.",
+            source="MONGODB",
+            run_id="ALL-RUNS",
+            affected_run_count=len(affected_run_ids),
+            mismatch_count=len(mismatches),
+            affected_run_ids=affected_run_ids[:20],
+            mismatches=mismatches[:20],
+        )
+    ]
+
+
 def _format_batch_time(value):
     return timezone.localtime(value).strftime("%H:%M") if value else "--:--"
 
@@ -123,6 +192,7 @@ def build_mongodb_dashboard_data(run, mongo_facts):
     batch_time = run_started_at(run) or mongo_facts.get("run_started_at")
     recent_rejections = [
         {
+            "run_id": item.get("run_id") or run.get("run_id"),
             "time": _format_batch_time(item.get("run_started_at") or batch_time),
             "record": item["record"],
             "stage": "표준화" if item["stage"] == "standardization" else "정규화",
@@ -199,41 +269,62 @@ class MongoDBDashboardService:
 
     def get_dashboard(self, run_id=None):
         repository_alerts = []
+        aggregate_scope = run_id is None
         try:
-            run = self.mysql_repository.get_run_summary(run_id) if run_id else self.mysql_repository.get_latest_run_summary()
-            if run is None:
+            if run_id:
+                selected_run = self.mysql_repository.get_run_summary(run_id)
+                all_runs = [selected_run] if selected_run else []
+                run = selected_run or empty_run_summary()
+            else:
+                all_runs = self.mysql_repository.get_all_run_summaries()
+                run = aggregate_run_summaries(all_runs)
+            if not all_runs:
                 run = empty_run_summary()
                 repository_alerts.append(make_alert("WARNING", "NO_BATCH_DATA", "조회 가능한 배치가 없습니다.", source="MYSQL"))
         except PipelineRepositoryError:
+            all_runs = []
             run = empty_run_summary()
             history = []
-            repository_alerts.append(make_alert("CRITICAL", "MYSQL_UNAVAILABLE", "MySQL 배치 데이터를 조회할 수 없습니다.", source="MYSQL"))
+            repository_alerts.append(make_alert("CRITICAL", "MYSQL_UNAVAILABLE", "MySQL 배치 데이터를 조회할 수 없습니다.", source="MYSQL", run_id=run_id))
         else:
-            try:
-                history = self.mysql_repository.get_run_history(limit=12)
-            except PipelineRepositoryError:
-                history = []
-                repository_alerts.append(
-                    make_alert(
-                        "WARNING",
-                        "MYSQL_HISTORY_UNAVAILABLE",
-                        "현재 배치는 조회했지만 MySQL 배치 이력을 조회할 수 없습니다.",
-                        source="MYSQL",
-                        run_id=run["run_id"],
+            if aggregate_scope:
+                history = all_runs[:12]
+            else:
+                try:
+                    history = self.mysql_repository.get_run_history(limit=12)
+                except PipelineRepositoryError:
+                    history = []
+                    repository_alerts.append(
+                        make_alert(
+                            "WARNING",
+                            "MYSQL_HISTORY_UNAVAILABLE",
+                            "현재 배치는 조회했지만 MySQL 배치 이력을 조회할 수 없습니다.",
+                            source="MYSQL",
+                            run_id=run["run_id"],
+                        )
                     )
-                )
 
         if run["run_id"] == "NO-BATCH":
             mongo_facts = empty_mongo_facts(run["run_id"])
             trend = {}
+            mongo_available = False
         else:
             try:
-                mongo_facts = self.mongodb_repository.get_rejection_summary(run["run_id"])
+                if aggregate_scope:
+                    mongo_facts = self.mongodb_repository.get_rejection_summary_for_runs(
+                        [item["run_id"] for item in all_runs]
+                    )
+                else:
+                    mongo_facts = self.mongodb_repository.get_rejection_summary(
+                        run["run_id"]
+                    )
             except MongoRepositoryError:
                 mongo_facts = empty_mongo_facts(run["run_id"])
                 trend = {}
+                mongo_available = False
                 repository_alerts.append(make_alert("CRITICAL", "MONGODB_UNAVAILABLE", "MongoDB rejected 데이터를 조회할 수 없습니다.", source="MONGODB", run_id=run["run_id"]))
             else:
+                mongo_available = True
                 try:
                     trend = self.mongodb_repository.get_run_counts([item["run_id"] for item in history])
                 except MongoRepositoryError:
@@ -249,7 +340,28 @@ class MongoDBDashboardService:
                     )
 
         mongo = build_mongodb_dashboard_data(run, mongo_facts)
-        alerts = repository_alerts + evaluate_mysql_alerts(run, history, policy=self.alert_policy) + evaluate_mongodb_alerts(run, mongo_facts, policy=self.alert_policy)
+        alert_run = all_runs[0] if aggregate_scope and all_runs else run
+        mysql_alerts = (
+            evaluate_mysql_alerts(alert_run, history, policy=self.alert_policy)
+            if all_runs
+            else []
+        )
+        if not mongo_available:
+            mongo_alerts = []
+        elif aggregate_scope:
+            mongo_alerts = evaluate_mongodb_alerts(
+                run,
+                mongo_facts,
+                policy=self.alert_policy,
+                check_counts=False,
+            ) + evaluate_mongodb_run_alignment(all_runs, mongo_facts)
+        else:
+            mongo_alerts = evaluate_mongodb_alerts(
+                run,
+                mongo_facts,
+                policy=self.alert_policy,
+            )
+        alerts = repository_alerts + mysql_alerts + mongo_alerts
         status = alert_status(alerts)
         history_for_chart = list(reversed(history))
 
@@ -257,6 +369,13 @@ class MongoDBDashboardService:
         context.update(
             {
                 "mongo": mongo,
+                "aggregation_scope": "ALL_RUNS" if aggregate_scope else "SINGLE_RUN",
+                "aggregated_run_count": len(all_runs),
+                "aggregation_label": (
+                    f"ALL {len(all_runs):,} RUNS"
+                    if aggregate_scope
+                    else f"RUN {run['run_id']}"
+                ),
                 "alerts": alerts,
                 "overall_status": status,
                 "overall_status_label": "정상" if status == "NORMAL" else "경고" if status == "WARNING" else "위험",

@@ -18,6 +18,7 @@
             <a href="{% url 'datapipeline:main' %}"><span>01</span> 통합 관제</a>
             <a class="active" href="{% url 'datapipeline:mysql' %}"><span>02</span> MySQL</a>
             <a href="{% url 'datapipeline:mongodb' %}"><span>03</span> MongoDB</a>
+            <a href="{% url 'datapipeline:gold' %}"><span>04</span> Gold</a>
         </nav>
         <div class="system-cluster"><span class="demo-tag">{{ data_mode }}</span><span class="system-online status-{{ overall_status|lower }}"><i></i> {{ overall_status }} · {{ alerts|length }} SIGNALS</span><time class="clock">--:--:--</time></div>
     </header>
@@ -28,9 +29,9 @@
             <div>
                 <p>DATABASE CHANNEL / ACCEPTED DATA</p>
                 <h1><span class="database-title-icon mysql-title-icon">MY</span> MYSQL <b>ACCEPTED MONITOR</b></h1>
-                <small>표준화와 정규화를 통과한 데이터의 테이블별 적재 상태를 추적합니다.</small>
+                <small>{% if aggregation_scope == 'ALL_RUNS' %}MySQL View 전체 {{ aggregated_run_count|intcomma }}개 run의 accepted 및 테이블 적재 상태를 집계합니다.{% else %}선택한 run_id의 accepted 및 테이블 적재 상태를 추적합니다.{% endif %}</small>
             </div>
-            <div class="detail-actions"><a href="{% url 'datapipeline:main' %}">← 3D 통합 관제</a><a class="purple-action" href="{% url 'datapipeline:mongodb' %}">MongoDB rejected →</a></div>
+            <div class="detail-actions"><a href="{% url 'datapipeline:main' %}">← 3D 통합 관제</a><a class="purple-action" href="{% url 'datapipeline:mongodb' %}">MongoDB rejected →</a><a class="gold-action" href="{% url 'datapipeline:gold' %}">Gold intelligence →</a></div>
         </header>
 
         <section class="cyber-kpi-grid" aria-label="MySQL 핵심 지표">
@@ -42,7 +43,7 @@
 
         <section class="analytics-grid">
             <article class="hud-panel span-8 chart-panel tall-chart-panel">
-                <div class="panel-title"><span>LOAD RATE TELEMETRY</span><b>LAST 3 HOURS</b></div>
+                <div class="panel-title"><span>LOAD RATE TELEMETRY</span><b>KST · 30 MIN BUCKETS</b></div>
                 <div class="echart chart-large" data-dashboard-chart="mysqlLoadTrend" role="img" aria-label="시간대별 MySQL 적재율"></div>
             </article>
             <article class="hud-panel span-4 chart-panel tall-chart-panel">
@@ -51,7 +52,7 @@
             </article>
 
             <article class="hud-panel span-12 stage-channel-panel">
-                <div class="panel-title"><span>ACCEPTED DATA CHANNEL</span><b>{{ updated_at }}</b></div>
+                <div class="panel-title"><span>ACCEPTED DATA CHANNEL</span><b>{{ aggregation_label }}</b></div>
                 <div class="cyber-stage-flow accepted-stage-flow">
                     <div><span>01</span><small>LEGACY INPUT</small><strong>{{ mysql.standardized.input|intcomma }}</strong><em>100%</em></div><i></i>
                     <div><span>02</span><small>STANDARD ACCEPTED</small><strong>{{ mysql.standardized.accepted|intcomma }}</strong><em>{{ mysql.standardized.rate }}%</em></div><i></i>

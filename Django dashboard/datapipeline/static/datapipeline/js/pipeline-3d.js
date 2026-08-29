@@ -284,20 +284,23 @@ if (canvas && payloadNode) {
         const positions = {
             legacy: new THREE.Vector3(-5.4, 0.35, 0),
             standard: new THREE.Vector3(-2.35, 0.35, 0),
-            normalize: new THREE.Vector3(0.75, 0.35, 0),
-            mysql: new THREE.Vector3(4.55, 1.85, -0.1),
-            mongo: new THREE.Vector3(4.55, -1.38, -0.1),
+            normalize: new THREE.Vector3(0.45, 0.35, 0),
+            gold: new THREE.Vector3(2.8, 1.5, -0.05),
+            mysql: new THREE.Vector3(5.1, 2.15, -0.1),
+            mongo: new THREE.Vector3(4.55, -1.5, -0.1),
         };
 
         createStageNode({ title: "LEGACY", value: data.legacy, color: "#20d9ff", position: positions.legacy, geometry: "octa" });
         createStageNode({ title: "STANDARDIZE", value: data.standardized, color: "#38a6ff", position: positions.standard });
         createStageNode({ title: "NORMALIZE", value: data.normalized, color: "#15e6c1", position: positions.normalize });
+        createStageNode({ title: "GOLD FEATURES", value: data.goldManagers, color: "#f7c948", position: positions.gold, url: canvas.dataset.goldUrl });
         createDatabaseNode({ title: "MYSQL ACCEPTED", value: data.mysqlLoaded, color: "#15e6c1", position: positions.mysql, url: canvas.dataset.mysqlUrl, shape: "octa" });
         createDatabaseNode({ title: "MONGODB REJECTED", value: data.mongoLoaded, color: "#a855f7", position: positions.mongo, url: canvas.dataset.mongoUrl, shape: "dodeca" });
 
         createFlow(makeCurve(positions.legacy, positions.standard, 0.55, 0.35), "#20d9ff", 24, 0.095);
         createFlow(makeCurve(positions.standard, positions.normalize, 0.45, -0.2), "#38a6ff", 20, 0.088);
-        createFlow(makeCurve(positions.normalize, positions.mysql, 1.15, 0.55), "#15e6c1", 24, 0.1);
+        createFlow(makeCurve(positions.normalize, positions.gold, 0.72, 0.34), "#f7c948", 18, 0.09);
+        createFlow(makeCurve(positions.gold, positions.mysql, 0.48, 0.35), "#15e6c1", 20, 0.1);
         createFlow(makeCurve(positions.standard, positions.mongo, -1.45, -0.8), "#a855f7", 14, 0.075);
         createFlow(makeCurve(positions.normalize, positions.mongo, -0.8, 0.65), "#f59e0b", 10, 0.068);
 

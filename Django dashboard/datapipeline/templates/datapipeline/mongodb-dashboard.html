@@ -18,6 +18,7 @@
             <a href="{% url 'datapipeline:main' %}"><span>01</span> 통합 관제</a>
             <a href="{% url 'datapipeline:mysql' %}"><span>02</span> MySQL</a>
             <a class="active purple-active" href="{% url 'datapipeline:mongodb' %}"><span>03</span> MongoDB</a>
+            <a href="{% url 'datapipeline:gold' %}"><span>04</span> Gold</a>
         </nav>
         <div class="system-cluster"><span class="demo-tag">{{ data_mode }}</span><span class="system-online status-{{ overall_status|lower }}"><i></i> {{ overall_status }} · {{ alerts|length }} SIGNALS</span><time class="clock">--:--:--</time></div>
     </header>
@@ -28,9 +29,9 @@
             <div>
                 <p>DATABASE CHANNEL / REJECTED + REASON</p>
                 <h1><span class="database-title-icon mongo-title-icon">MO</span> MONGODB <b>REJECTION MONITOR</b></h1>
-                <small>표준화·정규화 단계에서 rejected된 데이터와 반려 사유를 추적합니다.</small>
+                <small>{% if aggregation_scope == 'ALL_RUNS' %}MySQL View 전체 {{ aggregated_run_count|intcomma }}개 run과 일치하는 rejected 데이터 및 반려 사유를 집계합니다.{% else %}선택한 run_id의 rejected 데이터 및 반려 사유를 추적합니다.{% endif %}</small>
             </div>
-            <div class="detail-actions"><a href="{% url 'datapipeline:main' %}">← 3D 통합 관제</a><a class="cyan-action" href="{% url 'datapipeline:mysql' %}">MySQL accepted →</a></div>
+            <div class="detail-actions"><a href="{% url 'datapipeline:main' %}">← 3D 통합 관제</a><a class="cyan-action" href="{% url 'datapipeline:mysql' %}">MySQL accepted →</a><a class="gold-action" href="{% url 'datapipeline:gold' %}">Gold intelligence →</a></div>
         </header>
 
         <section class="cyber-kpi-grid" aria-label="MongoDB 핵심 지표">
@@ -51,7 +52,7 @@
             </article>
 
             <article class="hud-panel span-12 stage-channel-panel rejected-channel-panel">
-                <div class="panel-title"><span>REJECTED DATA ROUTING</span><b>{{ updated_at }}</b></div>
+                <div class="panel-title"><span>REJECTED DATA ROUTING</span><b>{{ aggregation_label }}</b></div>
                 <div class="rejection-routing-flow">
                     <div class="routing-input"><small>PIPELINE INPUT</small><strong>{{ mongo.standardized.input|intcomma }}</strong><span>validation target</span></div><i></i>
                     <div class="routing-split"><article><small>STANDARD REJECTED</small><strong>{{ mongo.standardized.rejected|intcomma }}</strong><em>{{ mongo.standardized.rate }}%</em></article><article><small>NORMALIZED REJECTED</small><strong>{{ mongo.normalized.rejected|intcomma }}</strong><em>{{ mongo.normalized.rate }}%</em></article></div><i></i>
@@ -84,7 +85,7 @@
                     <article><div><i></i><strong>{{ collection.name }}</strong><small>{{ collection.stage }} rejected</small></div><b>{{ collection.rate }}%</b><span><i style="--value:{{ collection.rate }}%"></i></span><p>{{ collection.loaded|intcomma }} / {{ collection.expected|intcomma }} documents</p></article>
                     {% endfor %}
                 </div>
-                <div class="mongo-link-summary"><div class="link-core mongo-link-core"><span>MO</span><i></i><i></i></div><p><strong>MongoRepository</strong>두 rejected 컬렉션을 동일 run_id 기준으로 집계합니다.</p></div>
+                <div class="mongo-link-summary"><div class="link-core mongo-link-core"><span>MO</span><i></i><i></i></div><p><strong>MongoRepository</strong>두 rejected 컬렉션을 MySQL View의 run_id 집합 기준으로 집계합니다.</p></div>
             </article>
 
             <article class="hud-panel span-12 data-grid-panel">
