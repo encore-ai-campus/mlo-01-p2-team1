@@ -79,3 +79,31 @@ result = do_standardization(
 설치한다. 동일한 입력, 규칙 파일, 코드 버전으로 같은 `run_id`를 재실행하면
 기존 산출물을 변경하지 않고 반환한다. 같은 `run_id`에 다른 입력이 들어오면
 기존 결과의 덮어쓰기를 막기 위해 실행을 실패시킨다.
+
+## functions
+
+### get_raw_data_from_mongodb()
+- 해당 함수는 mongodb server에 연결해서 raw data를 가져오는 역할을 수행한다.
+
+1. Document를 단순 `find()`로 읽어오지 않고, `find_one_and_update()`를 사용한다. 따라서, `processing_status의` `pending` -> `in_progress`변경을 원자적으로 처리한다.
+2. mongodb의 manifest 콜렉션에 `crawl_status`를 도입하고, `crawl_status==running`인 데이터는 가져오지 않는다.
+3. 즉, 데이터를 가져오는 조건식은 manifest 컬렉션의 `crawl_status==completed` and `processing_status==pending`인 경우다.
+4. mongodb에서 일반 컬렉션에서 격리 컬렉션으로 옮기는 작업은 하나의 transaction으로 묶어야 한다.
+5. audit module또한 `crawl_status==completed` and `processing_status==pending`인 데이터에 대해서만 처리한다.
+	- 단, 매개변수로 run_id만 받는데, run_id가 None인 경우에만 이런 조건을 따져서 처리하고, 아니면 해당 run_id에 대해서 처리한다.
+
+
+1. mongodb에는 총 4개의 collection이 존재한다.
+	1) manifest collection
+	2) raw_datas collection
+	3) 격리_manifest collection
+	4) 격리 raw_datas collection
+
+2. manifest collection에서 `crawl_status==completed` and `processing_status==pending`인 documents를 찾고 가장 첫번째 document의 `run_id`, `total_bytes`를 꺼낸다.
+3. `run_id`를 이용해서 `raw_datas collection에서 데이터를 꺼낸다.
+4. `total_bytes`와 `raw_datas`의 전체 크기를 비교해 데이터 변조 여부를 체크하고, 변조가 없다면 해당 데이터를 반환한다. 단, 변조가 있다면 audit module을 호출해서 격리시킨다.
+5. 만약, 전체 과정에서 한 부분에서라도 에러가 발생하면, 로그를 만들고 종료한다.(?) -> 종료를 해야할까? 아니면 다시 try하는게 좋을까?
+
+6. audit module은 crontab과 같은 스케쥴링 프로그램을 이용해서 manifest collection에서 `crawl_status==completed` and `processing_status==pending`인 랜덤한 `run_id`를 가져오고, 얘네들에 대해 Sha-256검사를 수행한다.
+
+만약, 이상이 있으면 모두 격리 manifest, 격리 raw_datas 콜렉션으로 넘긴다.
