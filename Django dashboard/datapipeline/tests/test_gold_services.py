@@ -12,18 +12,26 @@ from datapipeline.service.gold_services import (
 
 def make_gold_row(manager_id="EMP000001", **overrides):
     row = {
+        "run_id": "gold-run-001",
+        "as_of_datetime": "2026-08-28T15:30:05",
+        "pipeline_completed_at": "2026-08-28T15:32:10",
         "manager_id": manager_id,
         "manager_department_name": "분석팀",
         "manager_position_name": "팀장",
         "manager_active_flag": 1,
         "manager_tenure_days": 2100,
         "managed_area_count": 3,
-        "managed_top_area_count": 2,
-        "managed_parent_area_count": 1,
-        "top_level_area_count": 0,
-        "average_area_age_days": 800.0,
-        "max_area_age_days": 1200,
-        "cross_top_area_flag": 1,
+        "workload_score": 4.5,
+        "peer_average_workload_score": 3.0,
+        "peer_average_area_count": 2.4,
+        "workload_ratio": 1.5,
+        "reassignment_required_flag": 1,
+        "reassignment_priority": "MEDIUM",
+        "recommended_reassignment_area_count": 1,
+        "reassignment_reason_code": "WORKLOAD_RATIO_HIGH",
+        "reassignment_reason": "동료 평균보다 업무량이 높습니다.",
+        "workload_rule_version": "area_load_v1",
+        "feature_version": "v1",
     }
     row.update(overrides)
     return row
@@ -37,7 +45,7 @@ class FakeGoldRepository:
         self.error = error
         self.calls = []
 
-    def get_manager_features(self, limit=2000):
+    def get_manager_features(self, limit=5000):
         self.calls.append(limit)
         if self.error:
             raise self.error
@@ -45,7 +53,7 @@ class FakeGoldRepository:
 
 
 class GoldServiceTests(SimpleTestCase):
-    def test_builder_calculates_manager_grain_kpis_and_chart_contracts(self):
+    def test_builder_calculates_workload_and_reassignment_contracts(self):
         rows = [
             make_gold_row(),
             make_gold_row(
@@ -53,49 +61,53 @@ class GoldServiceTests(SimpleTestCase):
                 manager_department_name="생산팀",
                 manager_active_flag=0,
                 managed_area_count=0,
-                managed_top_area_count=0,
-                managed_parent_area_count=0,
-                cross_top_area_flag=0,
+                workload_score=0.0,
+                workload_ratio=0.0,
+                reassignment_required_flag=0,
+                reassignment_priority="NORMAL",
+                recommended_reassignment_area_count=0,
+                reassignment_reason_code="",
+                reassignment_reason="",
             ),
         ]
 
         gold = build_gold_dashboard_data(rows)
 
+        self.assertEqual(gold["run_id"], "gold-run-001")
         self.assertEqual(gold["total_managers"], 2)
         self.assertEqual(gold["active_rate"], 50.0)
-        self.assertEqual(gold["cross_top_count"], 1)
+        self.assertEqual(gold["reassignment_required_count"], 1)
+        self.assertEqual(gold["reassignment_required_rate"], 50.0)
         self.assertEqual(gold["unassigned_count"], 1)
         self.assertEqual(gold["average_area_count"], 1.5)
         self.assertEqual(gold["feature_rows"][1]["review_signal"], "UNASSIGNED")
         self.assertEqual(gold["chart_payload"]["goldWorkloadMatrix"]["type"], "scatter")
         self.assertEqual(gold["chart_payload"]["goldFeatureRadar"]["type"], "radar")
+        self.assertIn("workloadScore", gold["scene_managers"][0])
 
-    def test_gold_validation_detects_duplicate_and_feature_contradictions(self):
+    def test_gold_validation_detects_snapshot_and_feature_errors(self):
         rows = [
             make_gold_row(),
             make_gold_row(
-                managed_area_count=1,
-                managed_top_area_count=2,
-                top_level_area_count=3,
-                cross_top_area_flag=0,
-                average_area_age_days=1300,
-                max_area_age_days=1200,
+                run_id="gold-run-002",
+                manager_tenure_days=-1,
+                reassignment_reason="",
             ),
         ]
 
         codes = {alert["code"] for alert in evaluate_gold_alerts(rows)}
 
         self.assertIn("DUPLICATE_GOLD_MANAGER", codes)
+        self.assertIn("MULTIPLE_GOLD_RUNS", codes)
         self.assertIn("INVALID_GOLD_FEATURE", codes)
-        self.assertIn("CROSS_TOP_FLAG_MISMATCH", codes)
-        self.assertIn("AREA_AGE_MISMATCH", codes)
+        self.assertIn("MISSING_REASSIGNMENT_REASON", codes)
 
     def test_dashboard_service_keeps_view_failure_renderable(self):
         repository = FakeGoldRepository(error=GoldRepositoryError("unavailable"))
 
         context = GoldDashboardService(gold_repository=repository).get_dashboard()
 
-        self.assertEqual(repository.calls, [2000])
+        self.assertEqual(repository.calls, [5000])
         self.assertEqual(context["gold"]["total_managers"], 0)
         self.assertEqual(context["overall_status"], "CRITICAL")
         self.assertEqual(context["alerts"][0]["code"], "GOLD_VIEW_UNAVAILABLE")
@@ -107,7 +119,7 @@ class GoldServiceTests(SimpleTestCase):
 
         context = GoldDashboardService(gold_repository=repository).get_dashboard()
 
-        self.assertEqual(repository.calls, [2000])
+        self.assertEqual(repository.calls, [5000])
         self.assertEqual(context["view_name"], "dashboard_gold_manager_assignment_view")
         self.assertEqual(context["source_status"], "SYNCHRONIZED")
         self.assertEqual(context["gold"]["total_managers"], 2)

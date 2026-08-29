@@ -153,7 +153,7 @@ if (canvas && payloadNode) {
             const unassigned = Number(manager.areaCount || 0) === 0;
             const color = unassigned
                 ? 0xf59e0b
-                : manager.crossTop
+                : manager.reassignmentRequired
                     ? 0xf7c948
                     : departmentColors.get(manager.department) || 0x20d9ff;
             const size = 0.13 + Math.min(0.26, Number(manager.areaCount || 0) * 0.022);
@@ -173,7 +173,7 @@ if (canvas && payloadNode) {
             group.add(mesh);
             managerMeshes.push(mesh);
 
-            if (manager.crossTop) {
+            if (manager.reassignmentRequired) {
                 const ring = new THREE.Mesh(
                     new THREE.TorusGeometry(size * 1.7, 0.012, 6, 48),
                     new THREE.MeshBasicMaterial({
@@ -318,7 +318,7 @@ if (canvas && payloadNode) {
             if (tooltip) {
                 if (hovered?.userData.manager) {
                     const manager = hovered.userData.manager;
-                    tooltip.textContent = `${manager.managerId}\n${manager.department} · ${manager.position}\nAREA ${manager.areaCount} · TOP ${manager.topAreaCount}`;
+                    tooltip.textContent = `${manager.managerId}\n${manager.department} · ${manager.position}\nAREA ${manager.areaCount} · SCORE ${manager.workloadScore}\n${manager.priority || "NORMAL"} · RATIO ${manager.workloadRatio}`;
                     tooltip.hidden = false;
                     tooltip.style.left = `${((pointer.x + 1) / 2) * canvas.clientWidth + 14}px`;
                     tooltip.style.top = `${((1 - pointer.y) / 2) * canvas.clientHeight + 14}px`;

@@ -23,7 +23,7 @@
     let currentMode = "all";
 
     function matchesMode(row) {
-        if (currentMode === "cross") return row.dataset.cross === "1";
+        if (currentMode === "reassignment") return row.dataset.reassignment === "1";
         if (currentMode === "unassigned") return row.dataset.unassigned === "1";
         if (currentMode === "active") return row.dataset.active === "1";
         return true;
@@ -106,18 +106,26 @@
 
     document.querySelector("[data-gold-export]")?.addEventListener("click", () => {
         const keys = [
+            "run_id",
+            "as_of_datetime",
+            "pipeline_completed_at",
             "manager_id",
             "manager_department_name",
             "manager_position_name",
             "manager_active_flag",
             "manager_tenure_days",
             "managed_area_count",
-            "managed_top_area_count",
-            "managed_parent_area_count",
-            "top_level_area_count",
-            "average_area_age_days",
-            "max_area_age_days",
-            "cross_top_area_flag",
+            "workload_score",
+            "peer_average_workload_score",
+            "peer_average_area_count",
+            "workload_ratio",
+            "reassignment_required_flag",
+            "reassignment_priority",
+            "recommended_reassignment_area_count",
+            "reassignment_reason_code",
+            "reassignment_reason",
+            "workload_rule_version",
+            "feature_version",
         ];
         const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
         const visibleFeatures = rows

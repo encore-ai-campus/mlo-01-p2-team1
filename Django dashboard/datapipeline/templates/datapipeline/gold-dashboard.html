@@ -6,11 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="담당자별 업무 배치 Feature와 AI Ready Gold Medallion 데이터를 탐색하는 지능형 관제 화면">
     <title>Gold Medallion Intelligence | Data Command</title>
-    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=gold1">
+    <link rel="stylesheet" href="{% static 'datapipeline/css/dashboard.css' %}?v=gold2">
     <script src="{% static 'datapipeline/vendor/echarts.min.js' %}?v=6.1.0" defer></script>
-    <script src="{% static 'datapipeline/js/dashboard.js' %}?v=gold1" defer></script>
-    <script src="{% static 'datapipeline/js/gold-dashboard.js' %}?v=gold1" defer></script>
-    <script type="module" src="{% static 'datapipeline/js/gold-3d.js' %}?v=gold1"></script>
+    <script src="{% static 'datapipeline/js/dashboard.js' %}?v=gold2" defer></script>
+    <script src="{% static 'datapipeline/js/gold-dashboard.js' %}?v=gold2" defer></script>
+    <script type="module" src="{% static 'datapipeline/js/gold-3d.js' %}?v=gold2"></script>
 </head>
 <body data-page="gold">
     <div class="ambient-grid gold-ambient-grid" aria-hidden="true"></div>
@@ -42,13 +42,13 @@
 
         <header class="detail-command-heading gold-command-heading">
             <div>
-                <p>MEDALLION CHANNEL / AI READY MANAGER FEATURES</p>
+                <p>MEDALLION CHANNEL / MANAGER WORKLOAD FEATURES</p>
                 <h1><span class="database-title-icon gold-title-icon">AU</span> GOLD <b>INTELLIGENCE CENTER</b></h1>
-                <small>담당자 단위 업무 배치 Feature를 3D 탐색하고 분포·편차·검증 신호를 함께 분석합니다.</small>
+                <small>담당자별 workload·동료 평균·재배치 권고 Feature를 3D 탐색하고 비교 분석합니다.</small>
             </div>
             <div class="gold-heading-meta">
                 <div><small>VIEW CONTRACT</small><strong title="{{ view_name }}">{{ view_name }}</strong></div>
-                <div><small>SNAPSHOT</small><strong>{{ updated_at }}</strong></div>
+                <div><small>RUN / SNAPSHOT</small><strong title="{{ gold.run_id }}">{{ gold.as_of_datetime|default:updated_at }}</strong></div>
                 <div class="detail-actions"><a href="{% url 'datapipeline:main' %}">← 3D 통합 관제</a><a class="cyan-action" href="{% url 'datapipeline:mysql' %}">Silver accepted →</a></div>
             </div>
         </header>
@@ -56,7 +56,7 @@
         <section class="gold-kpi-grid" aria-label="Gold 핵심 지표">
             <article class="cyber-kpi gold-kpi"><small>MANAGER UNIVERSE</small><strong>{{ gold.total_managers|intcomma }}</strong><span><b>{{ gold.active_count|intcomma }}</b> active managers</span><i style="--value:100%"></i></article>
             <article class="cyber-kpi cyan-kpi"><small>AVG AREA LOAD</small><strong>{{ gold.average_area_count }}</strong><span>maximum <b>{{ gold.max_area_count }}</b> areas</span><i style="--value:{{ gold.average_area_rate }}%"></i></article>
-            <article class="cyber-kpi gold-kpi"><small>CROSS-TOP SIGNAL</small><strong>{{ gold.cross_top_rate }}%</strong><span><b>{{ gold.cross_top_count|intcomma }}</b> multi-top managers</span><i style="--value:{{ gold.cross_top_rate }}%"></i></article>
+            <article class="cyber-kpi gold-kpi"><small>REASSIGNMENT SIGNAL</small><strong>{{ gold.reassignment_required_rate }}%</strong><span><b>{{ gold.reassignment_required_count|intcomma }}</b> review required</span><i style="--value:{{ gold.reassignment_required_rate }}%"></i></article>
             <article class="cyber-kpi amber-kpi"><small>UNASSIGNED</small><strong>{{ gold.unassigned_count|intcomma }}</strong><span><b>{{ gold.unassigned_rate }}%</b> without area</span><i style="--value:{{ gold.unassigned_rate }}%"></i></article>
             <article class="cyber-kpi teal-kpi"><small>ACTIVE RATE</small><strong>{{ gold.active_rate }}%</strong><span><b>{{ gold.active_count|intcomma }}</b> synchronized</span><i style="--value:{{ gold.active_rate }}%"></i></article>
             <article class="cyber-kpi purple-kpi"><small>AVG TENURE</small><strong>{{ gold.average_tenure_days|floatformat:0|intcomma }}</strong><span>days · <b>feature view</b></span><i style="--value:72%"></i></article>
@@ -73,7 +73,7 @@
                     <div class="gold-scene-instruction"><i></i> AUTO ORBIT ACTIVE · DRAG / ZOOM / SELECT MANAGER</div>
                     <div class="gold-legend">
                         <span><i class="legend-active"></i> ACTIVE</span>
-                        <span><i class="legend-cross"></i> CROSS-TOP</span>
+                        <span><i class="legend-cross"></i> REASSIGNMENT</span>
                         <span><i class="legend-empty"></i> UNASSIGNED</span>
                     </div>
                 </div>
@@ -88,7 +88,7 @@
                     <div class="panel-title"><span>WORKLOAD SIGNAL QUEUE</span><b>TOP {{ gold.top_workloads|length }}</b></div>
                     <ol class="gold-signal-list">
                         {% for manager in gold.top_workloads|slice:":5" %}
-                        <li data-manager-select="{{ manager.manager_id }}"><span>0{{ forloop.counter }}</span><div><strong>{{ manager.manager_id }}</strong><small>{{ manager.manager_department_name }} · {{ manager.manager_position_name }}</small></div><em>{{ manager.managed_area_count }}</em><b>AREA</b></li>
+                        <li data-manager-select="{{ manager.manager_id }}"><span>0{{ forloop.counter }}</span><div><strong>{{ manager.manager_id }}</strong><small>{{ manager.reassignment_priority|default:"NORMAL" }} · ratio {{ manager.workload_ratio }}</small></div><em>{{ manager.workload_score }}</em><b>SCORE</b></li>
                         {% empty %}
                         <li class="gold-empty-row"><div><strong>WAITING FOR GOLD VIEW</strong><small>데이터가 들어오면 workload signal이 표시됩니다.</small></div></li>
                         {% endfor %}
@@ -97,17 +97,17 @@
             </aside>
 
             <article class="hud-panel span-7 chart-panel gold-chart-panel">
-                <div class="panel-title"><span>WORKLOAD RISK MATRIX</span><b>TENURE × ASSIGNMENT</b></div>
-                <div class="echart gold-chart-large" data-dashboard-chart="goldWorkloadMatrix" role="img" aria-label="근속 연수와 담당 Area 수 산점도"></div>
+                <div class="panel-title"><span>WORKLOAD RISK MATRIX</span><b>TENURE × SCORE</b></div>
+                <div class="echart gold-chart-large" data-dashboard-chart="goldWorkloadMatrix" role="img" aria-label="근속 연수와 workload score 산점도"></div>
             </article>
             <article class="hud-panel span-5 chart-panel gold-chart-panel">
-                <div class="panel-title"><span>FEATURE SIGNATURE</span><b>TOP LOAD VS AVERAGE</b></div>
+                <div class="panel-title"><span>FEATURE SIGNATURE</span><b>WORKLOAD VS PEER</b></div>
                 <div class="echart gold-chart-large" data-dashboard-chart="goldFeatureRadar" role="img" aria-label="Gold Feature 레이더 비교"></div>
             </article>
 
             <article class="hud-panel span-6 chart-panel gold-chart-panel">
-                <div class="panel-title"><span>DEPARTMENT LOAD FIELD</span><b>AVG AREA</b></div>
-                <div class="echart gold-chart-medium" data-dashboard-chart="goldDepartmentLoad" role="img" aria-label="부서별 평균 담당 Area"></div>
+                <div class="panel-title"><span>DEPARTMENT LOAD FIELD</span><b>AVG WORKLOAD</b></div>
+                <div class="echart gold-chart-medium" data-dashboard-chart="goldDepartmentLoad" role="img" aria-label="부서별 평균 workload score"></div>
             </article>
             <article class="hud-panel span-6 chart-panel gold-chart-panel">
                 <div class="panel-title"><span>ASSIGNMENT FREQUENCY</span><b>MANAGER DISTRIBUTION</b></div>
@@ -122,7 +122,7 @@
                     <label><span>POSITION</span><select data-gold-position><option value="">전체 직급</option>{% for position in gold.positions %}<option value="{{ position }}">{{ position }}</option>{% endfor %}</select></label>
                     <div class="gold-filter-toggles" aria-label="빠른 필터">
                         <button type="button" class="active" data-gold-mode="all">ALL</button>
-                        <button type="button" data-gold-mode="cross">CROSS-TOP</button>
+                        <button type="button" data-gold-mode="reassignment">REASSIGNMENT</button>
                         <button type="button" data-gold-mode="unassigned">UNASSIGNED</button>
                         <button type="button" data-gold-mode="active">ACTIVE</button>
                     </div>
@@ -130,21 +130,21 @@
                 </div>
                 <div class="cyber-table-wrap gold-table-wrap">
                     <table class="cyber-table gold-feature-table">
-                        <thead><tr><th>MANAGER</th><th>DEPARTMENT / POSITION</th><th>ACTIVE</th><th>TENURE</th><th>AREA</th><th>TOP</th><th>PARENT</th><th>TOP LEVEL</th><th>AVG AGE</th><th>MAX AGE</th><th>SIGNAL</th></tr></thead>
+                        <thead><tr><th>MANAGER</th><th>DEPARTMENT / POSITION</th><th>ACTIVE</th><th>TENURE</th><th>AREA</th><th>WORKLOAD</th><th>PEER AVG</th><th>RATIO</th><th>PRIORITY</th><th>RECOMMEND</th><th>SIGNAL</th></tr></thead>
                         <tbody>
                             {% for manager in gold.feature_rows %}
-                            <tr tabindex="0" data-gold-row data-manager-id="{{ manager.manager_id }}" data-department="{{ manager.manager_department_name }}" data-position="{{ manager.manager_position_name }}" data-active="{{ manager.manager_active_flag }}" data-cross="{{ manager.cross_top_area_flag }}" data-unassigned="{% if manager.managed_area_count == 0 %}1{% else %}0{% endif %}">
+                            <tr tabindex="0" data-gold-row data-manager-id="{{ manager.manager_id }}" data-department="{{ manager.manager_department_name }}" data-position="{{ manager.manager_position_name }}" data-active="{{ manager.manager_active_flag }}" data-reassignment="{{ manager.reassignment_required_flag }}" data-unassigned="{% if manager.managed_area_count == 0 %}1{% else %}0{% endif %}">
                                 <td><strong>{{ manager.manager_id }}</strong></td>
                                 <td>{{ manager.manager_department_name }} <small>/ {{ manager.manager_position_name }}</small></td>
                                 <td><span class="state-chip {% if manager.manager_active_flag == 1 %}state-good{% else %}state-warn{% endif %}">{{ manager.active_label }}</span></td>
                                 <td>{{ manager.manager_tenure_days|intcomma }}d <small>{{ manager.tenure_years }}y</small></td>
                                 <td><div class="gold-area-meter"><i style="--value:{{ manager.relative_area_rate }}%"></i><b>{{ manager.managed_area_count }}</b></div></td>
-                                <td>{{ manager.managed_top_area_count }}</td>
-                                <td>{{ manager.managed_parent_area_count }}</td>
-                                <td>{{ manager.top_level_area_count }}</td>
-                                <td>{{ manager.average_area_age_days|floatformat:0|intcomma }}d</td>
-                                <td>{{ manager.max_area_age_days|intcomma }}d</td>
-                                <td><span class="gold-review-chip signal-{{ manager.review_signal|slugify }}">{{ manager.review_signal }}</span></td>
+                                <td>{{ manager.workload_score }}</td>
+                                <td>{{ manager.peer_average_workload_score }}</td>
+                                <td>{{ manager.workload_ratio }}</td>
+                                <td>{{ manager.reassignment_priority|default:"NORMAL" }}</td>
+                                <td>{{ manager.recommended_reassignment_area_count }}</td>
+                                <td title="{{ manager.reassignment_reason }}"><span class="gold-review-chip signal-{{ manager.review_signal|slugify }}">{{ manager.review_signal }}</span></td>
                             </tr>
                             {% empty %}
                             <tr><td colspan="11" class="gold-empty-cell">Gold View 연결 후 담당자 Feature가 표시됩니다.</td></tr>
@@ -163,18 +163,20 @@
         <dl class="gold-detail-grid">
             <div><dt>ACTIVE</dt><dd data-detail-field="active_label">-</dd></div>
             <div><dt>TENURE</dt><dd><span data-detail-field="manager_tenure_days">0</span> days</dd></div>
-            <div><dt>TOP AREA</dt><dd data-detail-field="managed_top_area_count">0</dd></div>
-            <div><dt>PARENT AREA</dt><dd data-detail-field="managed_parent_area_count">0</dd></div>
-            <div><dt>TOP LEVEL</dt><dd data-detail-field="top_level_area_count">0</dd></div>
-            <div><dt>CROSS TOP</dt><dd data-detail-field="cross_top_label">-</dd></div>
-            <div><dt>AVG AREA AGE</dt><dd><span data-detail-field="average_area_age_days">0</span> days</dd></div>
-            <div><dt>MAX AREA AGE</dt><dd><span data-detail-field="max_area_age_days">0</span> days</dd></div>
+            <div><dt>WORKLOAD SCORE</dt><dd data-detail-field="workload_score">0</dd></div>
+            <div><dt>PEER WORKLOAD</dt><dd data-detail-field="peer_average_workload_score">0</dd></div>
+            <div><dt>PEER AREA</dt><dd data-detail-field="peer_average_area_count">0</dd></div>
+            <div><dt>WORKLOAD RATIO</dt><dd data-detail-field="workload_ratio">0</dd></div>
+            <div><dt>REASSIGNMENT</dt><dd data-detail-field="reassignment_label">-</dd></div>
+            <div><dt>PRIORITY</dt><dd data-detail-field="reassignment_priority">-</dd></div>
+            <div><dt>RECOMMENDED AREA</dt><dd data-detail-field="recommended_reassignment_area_count">0</dd></div>
+            <div><dt>FEATURE VERSION</dt><dd data-detail-field="feature_version">-</dd></div>
         </dl>
-        <section><small>REVIEW SIGNAL</small><strong data-detail-field="review_signal">NORMAL</strong><p>Gold Feature는 이상 여부를 확정하지 않으며, 다른 담당자와의 패턴 차이를 탐색하기 위한 신호입니다.</p></section>
+        <section><small>REASSIGNMENT REASON</small><strong data-detail-field="review_signal">NORMAL</strong><p data-detail-field="reassignment_reason">Gold workload Feature는 담당자 간 업무 부하 차이를 검토하기 위한 신호입니다.</p></section>
     </aside>
     <div class="gold-drawer-backdrop" data-gold-drawer-backdrop hidden></div>
 
-    <footer class="command-footer gold-command-footer"><span>GOLD MEDALLION CHANNEL</span><span>GRAIN (VIEW SNAPSHOT, MANAGER_ID)</span><span>AI READY FEATURE MODE</span><b>UPDATED {{ updated_at }}</b></footer>
+    <footer class="command-footer gold-command-footer"><span>GOLD MEDALLION CHANNEL</span><span>GRAIN (LATEST RUN_ID, MANAGER_ID)</span><span>{{ gold.workload_rule_version|default:"WORKLOAD RULE" }} · {{ gold.feature_version|default:"FEATURE" }}</span><b>UPDATED {{ updated_at }}</b></footer>
     {{ chart_payload|json_script:"dashboard-chart-data" }}
     {{ scene_payload|json_script:"gold-scene-data" }}
     {{ feature_payload|json_script:"gold-feature-data" }}

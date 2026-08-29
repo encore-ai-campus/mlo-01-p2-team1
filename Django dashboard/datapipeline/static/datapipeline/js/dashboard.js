@@ -276,7 +276,7 @@
                 data: dataset.values,
                 symbolSize: (value) => 8 + Math.min(21, Number(value?.[2] || 0) * 3.2),
                 itemStyle: {
-                    color: (params) => params.data?.crossTop ? "#f7c948" : dataset.color,
+                    color: (params) => params.data?.reassignmentRequired || params.data?.crossTop ? "#f7c948" : dataset.color,
                     opacity: 0.76,
                     borderColor: "rgba(255,255,255,0.72)",
                     borderWidth: 0.7,
